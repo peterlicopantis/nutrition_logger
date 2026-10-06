@@ -145,16 +145,39 @@ remove individual entries. They count toward daily totals, energy balance, and
 the Apple Health export. **Reset day** clears both regular entries and these
 foods for that date.
 
-Lookup uses [Open Food Facts](https://world.openfoodfacts.org), with no API key
-or extra package required. This is product database search with support for
-simple descriptions, not a general AI nutrition estimator. Internet access is
-needed for lookup; manual entry works offline. The source link is shown with
-each match. Check the brand, flavor, size, and label: search results are
-community-supplied and cannot guarantee an exact match.
+Lookup uses a small set of verified [USDA FoodData Central](https://fdc.nal.usda.gov/)
+reference foods for plain-food searches, and [Open Food Facts](https://world.openfoodfacts.org)
+for packaged products. No API key or extra package is required. This is food
+database lookup with support for simple descriptions, not a general AI nutrition
+estimator. Plain foods in generic_foods.json (such as carrot, apple, banana,
+rice, and egg) work offline. All supported reference foods show a typical
+USDA household portion with estimated edible grams, preparation, and a source
+link. Choose a size or household measure, or enter your measured grams.
+The per-serving macros scale automatically; servings eaten multiplies that
+portion once. For example, a medium raw carrot defaults to approximately 61 g,
+an apple to 182 g, and a cup of cooked rice to 158 g. Size words such as
+"large carrot" select a sourced size where available. These are estimates,
+not measurements of your individual food. Packaged-product lookup needs internet access;
+match the brand, flavor, size, and label because community data cannot guarantee
+an exact package match.
+
+Clearing or changing the search text clears its results and cancels the pending
+request. Press Enter or Look up food once and wait for its status. Transient
+packaged-food database errors retry automatically once; a slow lookup times out
+with a retry message. Packaged results are matched against product names and
+brands, rather than words found only in ingredients.
 
 When a product has no usable serving information, its results are explicitly
-shown **per 100 g**. Enter the portion in grams (for example, 25 g is 0.25 of
-a 100 g portion). The app never treats those values as one bar or one item.
+shown **per 100 g**, with a required blank weight field. Enter grams to calculate
+the macros for your portion before saving. The app never treats 100 g as one
+bar or item. Packaged label servings keep their label macros and weight when
+available; volume-only servings (such as 250 ml) remain usable without assuming
+milliliters equal grams. Item-count hints prefill only known single-item reference
+portions; check the servings eaten for household measures and packaged labels.
+Macro edits remain proportional when you subsequently change size or grams.
+Logged entries keep their final serving label and macro snapshot for that date.
+Reference coverage comes from generic_foods.json; foods without reliable portion
+information need a measured weight or manual label entry.
 Missing core macros are excluded from search results; missing fiber stays
 unknown. Data is attributed to Open Food Facts under
 [ODbL](https://opendatacommons.org/licenses/odbl/1-0/).

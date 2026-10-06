@@ -225,7 +225,7 @@ class LookupTests(unittest.TestCase):
         self.assertIsNone(result)
 
     def test_barcode_lookup_and_cached_description_quantities(self):
-        body = json.dumps({"products": [label_product()]}).encode()
+        body = json.dumps({"products": [label_product(product_name="Rice Krispies Treats Original")]}).encode()
         with patch.object(food_lookup, "urlopen", return_value=io.BytesIO(body)) as opened:
             first = food_lookup.lookup_foods("I had 2 rice krispy treats")
             second = food_lookup.lookup_foods("I had a rice krispy treat")
@@ -256,6 +256,244 @@ class LookupTests(unittest.TestCase):
             with self.assertRaises(food_lookup.FoodLookupError):
                 food_lookup.lookup_foods("Different query")
         opened.assert_not_called()
+
+
+
+class ImprovedLookupTests(unittest.TestCase):
+    def setUp(self):
+        food_lookup._cache.clear()
+        food_lookup._search_requests.clear()
+        food_lookup._product_requests.clear()
+        food_lookup._inflight.clear()
+
+    def test_plain_foods_return_verified_reference_without_network(self):
+        with patch.object(food_lookup, "urlopen", side_effect=AssertionError("Plain foods must work offline")):
+            for query in ("carrot", "carrots", "I had a carrot", "apple", "banana", "broccoli", "spinach", "potato", "egg", "rice", "chicken"):
+                with self.subTest(query=query):
+                    result = food_lookup.lookup_foods(query)
+                    self.assertTrue(result["products"])
+                    for product in result["products"]:
+                        self.assertEqual(product["kind"], "generic")
+                        self.assertEqual(product["basis"], "serving")
+                        self.assertGreater(product["serving_g"], 0)
+                        self.assertIn("~", product["serving_label"])
+                        self.assertTrue(product["source_url"].startswith("https://fdc.nal.usda.gov/food-details/"))
+            carrot = food_lookup.lookup_foods("carrot")["products"][0]
+        self.assertEqual(carrot["name"], "Carrots, raw")
+        self.assertEqual(carrot["nutrition_per_100g"]["calories"], 41)
+        self.assertEqual(carrot["nutrition_per_100g"]["protein"], 0.93)
+        self.assertEqual(carrot["nutrition_per_100g"]["carbs"], 9.58)
+        self.assertEqual(carrot["nutrition_per_100g"]["fat"], 0.24)
+        self.assertEqual(carrot["nutrition_per_100g"]["fiber"], 2.8)
+
+    def test_preparation_and_product_queries_are_distinct(self):
+        raw = food_lookup.lookup_foods("raw carrots")["products"]
+        cooked = food_lookup.lookup_foods("cooked carrots")["products"]
+        self.assertEqual(len(raw), 1)
+        self.assertEqual(len(cooked), 1)
+        self.assertIn("cooked", cooked[0]["name"])
+        self.assertEqual(cooked[0]["nutrition_per_100g"]["calories"], 35)
+        self.assertEqual(cooked[0]["serving_g"], 46)
+        for query in ("carrot cake", "carrot juice"):
+            with self.subTest(query=query):
+                with patch.object(food_lookup, "urlopen", return_value=io.BytesIO(b'{"products":[]}')) as opened:
+                    result = food_lookup.lookup_foods(query)
+                self.assertEqual(result["products"], [])
+                opened.assert_called_once()
+
+    def test_packaged_results_match_titles_and_rank_closest_first(self):
+        products = [
+            label_product(code="0038000000002", product_name="Kimchi", ingredients_text="mega snack carrot"),
+            label_product(code="0038000000003", product_name="Mega Snack Chocolate"),
+            label_product(code="0038000000004", product_name="Mega Snack"),
+        ]
+        with patch.object(food_lookup, "urlopen", return_value=io.BytesIO(json.dumps({"products": products}).encode())):
+            result = food_lookup.lookup_foods("mega snack")
+        self.assertEqual([item["name"] for item in result["products"]], ["Mega Snack", "Mega Snack Chocolate"])
+
+    def test_transient_database_failure_retries_once(self):
+        from urllib.error import HTTPError
+        error = HTTPError("https://example.invalid", 503, "Busy", {}, None)
+        response = io.BytesIO(json.dumps({"products":[label_product(product_name="Mega Snack")]}).encode())
+        with patch.object(food_lookup, "urlopen", side_effect=[error, response]) as opened:
+            with patch.object(food_lookup.time, "sleep"):
+                result = food_lookup.lookup_foods("mega snack")
+        self.assertEqual(opened.call_count, 2)
+        self.assertEqual(len(food_lookup._search_requests), 2)
+        self.assertEqual(result["products"][0]["name"], "Mega Snack")
+        with patch.object(food_lookup, "urlopen", side_effect=AssertionError("Successful results must be cached")):
+            self.assertEqual(food_lookup.lookup_foods("Mega Snack")["products"], result["products"])
+
+    def test_two_timeouts_stop_and_allow_a_later_retry(self):
+        with patch.object(food_lookup, "urlopen", side_effect=TimeoutError("Timeout")) as opened:
+            with patch.object(food_lookup.time, "sleep"):
+                with self.assertRaises(food_lookup.FoodLookupError):
+                    food_lookup.lookup_foods("mega snack")
+        self.assertEqual(opened.call_count, 2)
+        self.assertEqual(food_lookup._inflight, {})
+        body = json.dumps({"products":[label_product(product_name="Mega Snack")]}).encode()
+        with patch.object(food_lookup, "urlopen", return_value=io.BytesIO(body)):
+            self.assertTrue(food_lookup.lookup_foods("mega snack")["products"])
+
+    def test_slow_search_does_not_block_a_different_query(self):
+        import threading
+        from concurrent.futures import ThreadPoolExecutor
+        from urllib.parse import parse_qs, urlparse
+        started = threading.Event()
+        release = threading.Event()
+        def respond(request, timeout):
+            query = parse_qs(urlparse(request.full_url).query)["search_terms"][0]
+            if query == "alpha snack":
+                started.set()
+                if not release.wait(5):
+                    raise TimeoutError("Test did not release search")
+            name = "Alpha Snack" if query == "alpha snack" else "Beta Snack"
+            return io.BytesIO(json.dumps({"products":[label_product(product_name=name)]}).encode())
+        with patch.object(food_lookup, "urlopen", side_effect=respond):
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                slow = pool.submit(food_lookup.lookup_foods, "alpha snack")
+                self.assertTrue(started.wait(2))
+                try:
+                    fast = pool.submit(food_lookup.lookup_foods, "beta snack")
+                    self.assertEqual(fast.result(timeout=2)["products"][0]["name"], "Beta Snack")
+                finally:
+                    release.set()
+                self.assertEqual(slow.result(timeout=2)["products"][0]["name"], "Alpha Snack")
+
+
+    def test_interrupted_read_retries_then_fails_safely(self):
+        from http.client import IncompleteRead, RemoteDisconnected
+        for error_type in (IncompleteRead, RemoteDisconnected):
+            with self.subTest(error_type=error_type):
+                self.setUp()
+                def failure():
+                    return IncompleteRead(b"partial", 100) if error_type is IncompleteRead else RemoteDisconnected("Disconnected")
+                body = json.dumps({"products":[label_product(product_name="Mega Snack")]}).encode()
+                with patch.object(food_lookup, "urlopen", side_effect=[failure(), io.BytesIO(body)]) as opened:
+                    with patch.object(food_lookup.time, "sleep"):
+                        self.assertTrue(food_lookup.lookup_foods("mega snack")["products"])
+                self.assertEqual(opened.call_count, 2)
+                self.setUp()
+                with patch.object(food_lookup, "urlopen", side_effect=[failure(), failure()]) as opened:
+                    with patch.object(food_lookup.time, "sleep"):
+                        with self.assertRaises(food_lookup.FoodLookupError):
+                            food_lookup.lookup_foods("mega snack")
+                self.assertEqual(opened.call_count, 2)
+                self.assertEqual(food_lookup._inflight, {})
+
+
+class ReferenceSourceLoggingTests(unittest.TestCase):
+    setUp = DailyLoggingTests.setUp
+    add = DailyLoggingTests.add
+
+    def test_reference_lookup_and_fractional_portion_are_day_scoped(self):
+        with patch.object(food_lookup, "urlopen", side_effect=AssertionError("Carrot lookup must be offline")):
+            response = self.client.get("/api/food-lookup?q=carrot")
+        self.assertEqual(response.status_code, 200)
+        carrot = response.json["products"][0]
+        saved = self.add(name=carrot["name"], serving_label=carrot["serving_label"], servings=0.3,
+                         calories=carrot["calories"], protein=carrot["protein"],
+                         carbs=carrot["carbs"], fat=carrot["fat"], fiber=carrot["fiber"],
+                         source_url=carrot["source_url"])
+        self.assertEqual(saved.status_code, 200)
+        self.assertEqual(saved.json["totals"]["calories"], 7.5)
+        self.assertEqual(saved.json["entry"]["calories"], 25.01)
+        self.assertEqual(saved.json["entry"]["serving_label"], "1 medium carrot (~61 g)")
+        self.assertEqual(saved.json["entry"]["source_url"], "https://fdc.nal.usda.gov/food-details/170393/nutrients")
+        self.assertEqual(melb.load_day_foods("2026-10-07"), [])
+        self.assertEqual(self.foods_path.read_bytes(), self.food_bytes)
+
+    def test_source_url_requires_exact_canonical_ascii_links(self):
+        urls = [
+            "https://world.openfoodfacts.org/product/12345678;redirect=evil",
+            "https://world.openfoodfacts.org/product/" + chr(0xff11) * 8,
+            "https://world.openfoodfacts.org:443/product/12345678",
+            "https://fdc.nal.usda.gov/food-details/170393/nutrients?redirect=evil",
+            "https://fdc.nal.usda.gov/food-details/170393/nutrients#fragment",
+            "https://fdc.nal.usda.gov:443/food-details/170393/nutrients",
+            "https://fdc.nal.usda.gov.evil.example/food-details/170393/nutrients",
+            "https://user:pass@fdc.nal.usda.gov/food-details/170393/nutrients",
+            "https://fdc.nal.usda.gov/food-details/170393/../170393/nutrients",
+            "https://fdc.nal.usda.gov/food-details/%31%37%30%33%39%33/nutrients",
+            "https://fdc.nal.usda.gov/food-details/170393/nutrients\n",
+        ]
+        for source in urls:
+            with self.subTest(source=source):
+                self.assertEqual(self.add(source_url=source).status_code, 400)
+        self.assertEqual(melb.load_day_foods("2026-10-06"), [])
+
+
+
+class TypicalPortionTests(unittest.TestCase):
+    def test_every_catalog_food_has_sourced_portions_and_scaled_default(self):
+        with patch.object(food_lookup, "urlopen", side_effect=AssertionError("Reference portions are offline")):
+            for food in food_lookup._generic_catalog:
+                with self.subTest(food=food["name"]):
+                    products = food_lookup.lookup_foods(food["aliases"][0])["products"]
+                    product = next(p for p in products if p["source_url"].endswith(f"/{food['fdc_id']}/nutrients"))
+                    self.assertTrue(product["portion_estimated"])
+                    self.assertFalse(product["requires_weight"])
+                    default = next(p for p in product["portions"] if p["id"] == product["default_portion_id"])
+                    self.assertGreater(default["grams"], 0)
+                    self.assertEqual(product["serving_g"], default["grams"])
+                    for portion in product["portions"]:
+                        self.assertTrue(portion["source_modifier"])
+                        self.assertGreater(portion["source_amount"], 0)
+                    for key in ("calories", "protein", "carbs", "fat", "fiber"):
+                        self.assertEqual(product["nutrition_per_100g"][key], float(food[key]))
+                        self.assertAlmostEqual(product[key], float(food[key]) * default["grams"] / 100, places=4)
+
+    def test_sizes_counts_and_preparations_use_their_own_weights(self):
+        with patch.object(food_lookup, "urlopen", side_effect=AssertionError("Known sizes are offline")):
+            large = food_lookup.lookup_foods("I had 2 large carrots")
+            self.assertEqual(large["suggested_servings"], 2)
+            self.assertEqual(len(large["products"]), 1)
+            self.assertEqual(large["products"][0]["serving_g"], 72)
+            self.assertTrue(large["products"][0]["portion_countable"])
+            cooked = food_lookup.lookup_foods("cooked carrots")["products"][0]
+            self.assertEqual(cooked["serving_g"], 46)
+            cup = next(p for p in cooked["portions"] if p["label"] == "1/2 cup slices")
+            self.assertEqual(cup["grams"], 78)
+            self.assertFalse(cup["countable"])
+            rice = food_lookup.lookup_foods("I had 2 rice")["products"][0]
+            self.assertFalse(rice["portion_countable"])
+
+    def test_result_mutations_do_not_change_portion_or_nutrition_reference(self):
+        first = food_lookup.lookup_foods("carrot")["products"][0]
+        first["portions"][0]["grams"] = 999
+        first["nutrition_per_100g"]["calories"] = 0
+        second = food_lookup.lookup_foods("carrot")["products"][0]
+        self.assertEqual(second["portions"][0]["grams"], 61)
+        self.assertEqual(second["nutrition_per_100g"]["calories"], 41)
+
+    def test_packaged_density_and_missing_weight_are_explicit(self):
+        known = food_lookup.normalize_product(label_product())
+        self.assertEqual(known["serving_g"], 22)
+        self.assertEqual(known["nutrition_per_100g"]["calories"], 400)
+        self.assertFalse(known["portion_estimated"])
+        self.assertFalse(known["requires_weight"])
+        unknown = food_lookup.normalize_product(label_product(
+            serving_size="", serving_quantity=None, serving_quantity_unit="",
+        ))
+        self.assertTrue(unknown["requires_weight"])
+        self.assertIsNone(unknown["serving_g"])
+        self.assertEqual(unknown["portions"], [])
+        self.assertEqual(unknown["nutrition_per_100g"]["calories"], 400)
+
+    def test_volume_label_macros_remain_usable_without_assuming_mass(self):
+        product = label_product(
+            serving_size="1 can (250 ml)", serving_quantity=250, serving_quantity_unit="ml",
+            product_quantity_unit="ml",
+            nutriments={"energy-kcal_serving":115, "proteins_serving":0,
+                        "carbohydrates_serving":27.5, "fat_serving":0},
+        )
+        result = food_lookup.normalize_product(product)
+        self.assertEqual(result["basis"], "serving")
+        self.assertEqual(result["calories"], 115)
+        self.assertEqual(result["serving_label"], "1 can (250 ml)")
+        self.assertIsNone(result["serving_g"])
+        self.assertIsNone(result["nutrition_per_100g"])
+        self.assertFalse(result["requires_weight"])
 
 
 if __name__ == "__main__":

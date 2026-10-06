@@ -10,7 +10,6 @@ from contextlib import contextmanager
 from collections.abc import Iterator
 from datetime import date, datetime
 from pathlib import Path
-from urllib.parse import urlparse
 
 from flask import Flask, jsonify, redirect, render_template, request, url_for
 
@@ -274,16 +273,11 @@ def api_add_day_food():
         source_url = payload.get("source_url") or ""
         if not isinstance(source_url, str):
             raise ValueError("Invalid nutrition source.")
-        if source_url:
-            source = urlparse(source_url)
-            if (
-                source.scheme != "https"
-                or source.netloc != "world.openfoodfacts.org"
-                or not re.fullmatch(r"/product/\d{8,14}", source.path)
-                or source.query
-                or source.fragment
-            ):
-                raise ValueError("Invalid nutrition source.")
+        if source_url and not re.fullmatch(
+            r"https://(?:world[.]openfoodfacts[.]org/product/[0-9]{8,14}|fdc[.]nal[.]usda[.]gov/food-details/[0-9]+/nutrients)",
+            source_url,
+        ):
+            raise ValueError("Invalid nutrition source.")
     except ValueError as exc:
         return jsonify(ok=False, error=str(exc)), 400
 
