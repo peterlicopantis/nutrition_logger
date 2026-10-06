@@ -107,6 +107,12 @@
     .food-result { border:1px solid var(--border); border-radius:12px; padding:12px; background:var(--card2); overflow-wrap:anywhere; }
     .food-result p, .day-food-item p { margin:7px 0; }
     .food-editor-heading { font-size:1rem; margin:18px 0 8px; }
+    .portion-controls { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin:12px 0; }
+    .portion-controls > p { grid-column:1 / -1; margin:0; }
+    @media (max-width:600px) {
+      .portion-controls { grid-template-columns:1fr; }
+      .portion-controls input, .portion-controls select { min-height:44px; font-size:16px; }
+    }
     .day-food-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
     .food-name-field { grid-column:span 2; }
     .food-warning { background:#362b12; border-color:#786023; }
@@ -314,6 +320,14 @@
     @media (min-width:601px) and (max-width:900px) and (max-height:500px) and (orientation:landscape) and (pointer:coarse) {
       .dashboard-page .mobile-summary .metrics { grid-template-columns:repeat(6,minmax(0,1fr)); }
       .dashboard-page .mobile-summary .metric .v { font-size:17px; }
+    }
+    .daily-log-panel { margin:8px 0; padding:10px 12px; }
+    .daily-log-heading { font-size:14px; line-height:20px; margin:0 0 4px; }
+    .daily-log-panel .day-food-item { padding:8px 0; }
+    .daily-log-panel .day-food-item:last-child { padding-bottom:0; }
+    @media (min-width:1024px) {
+      .daily-log-panel .day-food-item > div { display:flex; flex-wrap:wrap; align-items:center; gap:4px 12px; }
+      .daily-log-panel .day-food-item p { margin:0; }
     }
   </style>
 </head>

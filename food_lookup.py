@@ -1,4 +1,4 @@
-"""Search packaged-food labels from Open Food Facts without an API key.
+"""Find plain foods offline and packaged-food labels without an API key.
 
 Official schema and usage notes:
 https://openfoodfacts.github.io/documentation/docs/Product-Opener/api/
@@ -20,13 +20,18 @@ import os
 import re
 import threading
 import time
+import unicodedata
 from collections import OrderedDict, deque
+from pathlib import Path
+from http.client import HTTPException, IncompleteRead, RemoteDisconnected
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 USER_AGENT = "MELBNutrition/1.0 (local personal food diary)"
 REQUEST_TIMEOUT = 8
+REQUEST_BUDGET = 20
+RETRY_DELAY = 0.35
 MAX_RESPONSE_BYTES = 2_000_000
 CACHE_SECONDS = 3600
 CACHE_SIZE = 128
@@ -40,10 +45,22 @@ _lock = threading.RLock()
 _cache: OrderedDict[str, tuple[float, list[dict]]] = OrderedDict()
 _search_requests: deque[float] = deque()
 _product_requests: deque[float] = deque()
+_inflight: dict[str, _PendingLookup] = {}
+
+# A small verified subset of USDA SR Legacy, not a network dependency.
+with Path(__file__).with_name("generic_foods.json").open(encoding="utf-8") as catalog_file:
+    _generic_catalog = json.load(catalog_file)["foods"]
 
 
 class FoodLookupError(Exception):
     """A food lookup could not be completed; the message is safe to display."""
+
+
+class _PendingLookup:
+    def __init__(self):
+        self.done = threading.Event()
+        self.products: list[dict] | None = None
+        self.error: str | None = None
 
 
 def normalize_query(raw: str) -> tuple[str, float]:
@@ -211,6 +228,11 @@ def normalize_product(product: dict) -> dict | None:
                 basis = "100g"
     if macros is None:
         return None
+    # Keep the unrounded density separate from the displayed portion macros.
+    per_100g = copy.deepcopy(macros) if basis == "100g" else (
+        {key: value * 100 / serving_g if value is not None else None
+         for key, value in macros.items()} if serving_g else None
+    )
     if basis == "100g" and serving_g:
         macros = {key: value * serving_g / 100 if value is not None else None
                   for key, value in macros.items()}
@@ -222,87 +244,234 @@ def normalize_product(product: dict) -> dict | None:
         "name": name[:160], "brand": _text(product.get("brands"))[:200],
         "barcode": barcode, "serving_label": serving_label[:120],
         "serving_g": serving_g, "basis": basis,
+        "nutrition_per_100g": per_100g, "requires_weight": basis == "100g",
+        "portion_estimated": False, "portion_countable": False,
+        "portions": ([{"id": "label", "label": serving_label[:120],
+                       "grams": serving_g, "countable": False}]
+                     if serving_g else []),
+        "default_portion_id": "label" if serving_g else None,
         **{key: round(value, 4) if value is not None else None for key, value in macros.items()},
         "source_url": f"https://world.openfoodfacts.org/product/{barcode}",
+        "source_name": "Open Food Facts", "kind": "packaged",
     }
 
 
+def _generic_foods(query: str) -> list[dict]:
+    """Plain aliases and explicit sizes retain the food's preparation."""
+    key = query.casefold()
+    requested_size = None
+    size_match = re.match(r"^(extra small|extra large|small|medium|large|jumbo)\s+(.+)$", key)
+    if size_match:
+        requested_size, key = size_match.groups()
+    products = []
+    for food in _generic_catalog:
+        if key not in food["aliases"]:
+            continue
+        portions = copy.deepcopy(food["portions"])
+        default = next(portion for portion in portions if portion["id"] == food["default_portion_id"])
+        if requested_size:
+            # Do not substitute a raw item's size for a cooked preparation.
+            matching = next((portion for portion in portions if portion.get("size") == requested_size), None)
+            if matching is None:
+                continue
+            default = matching
+        grams = default["grams"]
+        per_100g = {nutrient: float(food[nutrient]) for nutrient in
+                    ("calories", "protein", "carbs", "fat", "fiber")}
+        products.append({
+            "name": food["name"], "brand": "", "barcode": "",
+            "serving_label": f"{default['label']} (~{grams:g} g)",
+            "serving_g": grams, "basis": "serving",
+            **{key: round(value * grams / 100, 4) for key, value in per_100g.items()},
+            "nutrition_per_100g": per_100g, "requires_weight": False,
+            "portions": portions, "default_portion_id": default["id"],
+            "portion_estimated": True, "portion_countable": default["countable"],
+            "source_url": f"https://fdc.nal.usda.gov/food-details/{food['fdc_id']}/nutrients",
+            "source_name": "USDA FoodData Central", "kind": "generic",
+        })
+    return products
+
+
+def _name_tokens(text: str) -> list[str]:
+    text = unicodedata.normalize("NFKD", text.casefold())
+    text = "".join(character for character in text if not unicodedata.combining(character))
+    tokens = []
+    aliases = {"kelloggs": "kellogg", "krispy": "krispie"}
+    for token in re.findall(r"[a-z0-9]+", text):
+        if token in {"a", "an", "the", "and", "of", "with", "for", "s"}:
+            continue
+        token = aliases.get(token, token)
+        if token.endswith("ies") and token not in {"cookies", "brownies", "pies", "krispies"}:
+            token = token[:-3] + "y"
+        elif len(token) > 3 and token.endswith("s") and not token.endswith(("ss", "us")):
+            token = token[:-1]
+        tokens.append(token)
+    return tokens
+
+
+def _match_score(query: str, product: dict, original: dict) -> tuple | None:
+    """Use the food's title and brand; ingredients do not establish a match."""
+    wanted = set(_name_tokens(query))
+    title_tokens = _name_tokens(product["name"])
+    title = set(title_tokens)
+    combined = title | set(_name_tokens(product["brand"]))
+    if not wanted or not wanted.issubset(combined):
+        return None
+    query_phrase = " ".join(_name_tokens(query))
+    title_phrase = " ".join(title_tokens)
+    return (
+        -len(wanted & title) / len(wanted),
+        -(query_phrase in title_phrase),
+        -bool(_text(original.get("product_name_en"))),
+        len(title - wanted),
+    )
+
+
+def _reserve_request(*, barcode: bool) -> None:
+    # Network calls and waits happen outside this lock. A slow, cancelled
+    # search cannot hold up a new query or an offline plain-food lookup.
+    with _lock:
+        now = time.monotonic()
+        timestamps = _product_requests if barcode else _search_requests
+        limit = 15 if barcode else 10
+        while timestamps and timestamps[0] <= now - 60:
+            timestamps.popleft()
+        if len(timestamps) >= limit:
+            seconds = max(1, math.ceil(60 - (now - timestamps[0])))
+            raise FoodLookupError(f"Food lookup is busy. Try again in {seconds} seconds, or enter the label manually.")
+        timestamps.append(now)
+
+
 def _request_json(url: str, *, barcode: bool) -> dict:
-    now = time.monotonic()
-    timestamps = _product_requests if barcode else _search_requests
-    limit = 15 if barcode else 10
-    while timestamps and timestamps[0] <= now - 60:
-        timestamps.popleft()
-    if len(timestamps) >= limit:
-        seconds = max(1, math.ceil(60 - (now - timestamps[0])))
-        raise FoodLookupError(f"Food lookup is busy. Try again in {seconds} seconds.")
-    timestamps.append(now)
+    deadline = time.monotonic() + REQUEST_BUDGET
     headers = {"User-Agent": USER_AGENT, "Accept": "application/json"}
     if os.environ.get("MELB_FOOD_LOOKUP_STAGING", "").lower() in ("1", "true", "yes"):
         headers["Authorization"] = "Basic " + base64.b64encode(b"off:off").decode("ascii")
-    try:
-        with urlopen(Request(url, headers=headers), timeout=REQUEST_TIMEOUT) as response:
-            raw = response.read(MAX_RESPONSE_BYTES + 1)
-        if len(raw) > MAX_RESPONSE_BYTES:
-            raise FoodLookupError("The food database returned too much data. Try a more specific name.")
-        data = json.loads(raw)
-    except HTTPError as error:
-        if error.code == 404 and barcode:
-            return {"products": []}
-        if error.code == 429:
-            raise FoodLookupError("The food database is busy. Wait a minute and try again.") from error
-        raise FoodLookupError("The food database is unavailable. Try again or enter the label manually.") from error
-    except (URLError, OSError, TimeoutError) as error:
-        raise FoodLookupError("Couldn't reach the food database. Try again or enter the label manually.") from error
-    except (ValueError, UnicodeDecodeError) as error:
-        raise FoodLookupError("The food database returned an unreadable result. Try again later.") from error
-    if not isinstance(data, dict):
+    last_error = None
+    for attempt in range(2):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
+        _reserve_request(barcode=barcode)
+        transient = False
+        try:
+            with urlopen(Request(url, headers=headers), timeout=min(REQUEST_TIMEOUT, remaining)) as response:
+                raw = response.read(MAX_RESPONSE_BYTES + 1)
+            if time.monotonic() > deadline:
+                raise TimeoutError("Food lookup exceeded its time budget")
+            if len(raw) > MAX_RESPONSE_BYTES:
+                raise FoodLookupError("The food database returned too much data. Try a more specific name.")
+            data = json.loads(raw)
+            if not isinstance(data, dict):
+                raise FoodLookupError("The food database returned an unexpected result. Try again later.")
+            return data
+        except HTTPError as error:
+            if error.code == 404 and barcode:
+                return {"products": []}
+            if error.code == 429:
+                raise FoodLookupError("The food database is busy. Wait a minute or enter the label manually.") from error
+            transient = error.code in (502, 503, 504)
+            last_error = error
+            error.close()
+        except (URLError, OSError, HTTPException) as error:
+            last_error = error
+            transient = isinstance(error, (TimeoutError, ConnectionError, IncompleteRead, RemoteDisconnected)) or (
+                isinstance(error, URLError) and isinstance(error.reason, (TimeoutError, ConnectionError, IncompleteRead, RemoteDisconnected))
+            )
+        except (ValueError, UnicodeDecodeError) as error:
+            raise FoodLookupError("The food database returned an unreadable result. Enter the label manually or try later.") from error
+        if not transient or attempt == 1 or deadline - time.monotonic() <= RETRY_DELAY:
+            break
+        time.sleep(RETRY_DELAY)
+    raise FoodLookupError("Couldn't reach the packaged-food database after trying automatically. You can still enter the label manually or search a plain food such as carrot.") from last_error
+
+
+def _fetch_products(query: str, *, barcode: bool, staging: bool) -> list[dict]:
+    base_url = "https://world.openfoodfacts.net" if staging else "https://world.openfoodfacts.org"
+    if barcode:
+        url = f"{base_url}/api/v3.6/product/{query}?" + urlencode({
+            "fields": PRODUCT_FIELDS, "lc": "en", "cc": "us",
+        })
+    else:
+        url = f"{base_url}/cgi/search.pl?" + urlencode({
+            "search_terms": query, "search_simple": 1, "action": "process",
+            "json": 1, "page_size": 24, "fields": PRODUCT_FIELDS,
+            "lc": "en", "cc": "us",
+        })
+    data = _request_json(url, barcode=barcode)
+    raw_products = [data["product"]] if barcode and isinstance(data.get("product"), dict) else data.get("products", [])
+    if not isinstance(raw_products, list):
         raise FoodLookupError("The food database returned an unexpected result. Try again later.")
-    return data
+    matches = []
+    seen = set()
+    for index, item in enumerate(raw_products):
+        product = normalize_product(item)
+        if not product or product["barcode"] in seen:
+            continue
+        score = () if barcode else _match_score(query, product, item)
+        if score is None:
+            continue
+        matches.append((score, index, product))
+        seen.add(product["barcode"])
+    matches.sort(key=lambda match: (match[0], match[1]))
+    return [match[2] for match in matches[:15]]
+
+
+def _packaged_result(query: str, servings: float, products: list[dict]) -> dict:
+    result = {"query": query, "suggested_servings": servings, "products": products}
+    if not products:
+        result["message"] = "No matching product name with complete nutrition was found. Add the brand, use a barcode, or enter the label manually."
+    return result
 
 
 def lookup_foods(raw: str) -> dict:
-    """Find packaged foods for a short description or an 8-14 digit barcode.
+    """Return plain-food reference values or matching packaged-food labels.
 
-    suggested_servings is only a count hint from 'I had 2 ...'; it never changes
-    a product's macros or turns 100 g into one item. Missing fiber stays None.
-    The app must let the user choose the matching package and confirm quantity.
+    A count hint from 'I had 2 ...' never changes a food's macros or turns
+    100 g into one item. The user confirms preparation/package and quantity.
     """
     query, servings = normalize_query(raw)
+    generic = _generic_foods(query)
+    if generic:
+        return {
+            "query": query, "suggested_servings": servings, "products": generic,
+            "message": "Choose the preparation and portion you ate. USDA portion weights are typical edible-weight estimates; you can change the size or grams.",
+        }
     barcode = re.fullmatch(r"[0-9]{8,14}", query) is not None
-    cache_key = ("barcode:" if barcode else "search:") + query.casefold()
-    # Serialize lookup requests, including cache checks, so concurrent callers
-    # cannot duplicate a query or exceed the per-process request budget.
+    staging = os.environ.get("MELB_FOOD_LOOKUP_STAGING", "").lower() in ("1", "true", "yes")
+    cache_key = ("staging:" if staging else "production:") + ("barcode:" if barcode else "search:") + query.casefold()
     with _lock:
         cached = _cache.get(cache_key)
         if cached and cached[0] > time.monotonic():
             _cache.move_to_end(cache_key)
-            products = copy.deepcopy(cached[1])
-        else:
-            staging = os.environ.get("MELB_FOOD_LOOKUP_STAGING", "").lower() in ("1", "true", "yes")
-            base_url = "https://world.openfoodfacts.net" if staging else "https://world.openfoodfacts.org"
-            if barcode:
-                url = f"{base_url}/api/v3.6/product/{query}?" + urlencode({"fields": PRODUCT_FIELDS, "lc": "en"})
-            else:
-                url = f"{base_url}/cgi/search.pl?" + urlencode({
-                    "search_terms": query, "search_simple": 1, "action": "process",
-                    "json": 1, "page_size": 24, "fields": PRODUCT_FIELDS,
-                })
-            data = _request_json(url, barcode=barcode)
-            raw_products = [data["product"]] if barcode and isinstance(data.get("product"), dict) else data.get("products", [])
-            if not isinstance(raw_products, list):
-                raise FoodLookupError("The food database returned an unexpected result. Try again later.")
-            products = []
-            seen = set()
-            for item in raw_products:
-                product = normalize_product(item)
-                if product and product["barcode"] not in seen:
-                    products.append(product)
-                    seen.add(product["barcode"])
-                if len(products) >= 15:
-                    break
+            return _packaged_result(query, servings, copy.deepcopy(cached[1]))
+        pending = _inflight.get(cache_key)
+        owner = pending is None
+        if owner:
+            pending = _PendingLookup()
+            _inflight[cache_key] = pending
+
+    if not owner:
+        # Only identical queries share a wait; different queries are independent.
+        if not pending.done.wait(REQUEST_BUDGET):
+            raise FoodLookupError("The food database is taking too long. Enter the label manually or try a plain food.")
+        if pending.error:
+            raise FoodLookupError(pending.error)
+        return _packaged_result(query, servings, copy.deepcopy(pending.products or []))
+
+    try:
+        products = _fetch_products(query, barcode=barcode, staging=staging)
+        with _lock:
             _cache[cache_key] = (time.monotonic() + CACHE_SECONDS, copy.deepcopy(products))
             _cache.move_to_end(cache_key)
             while len(_cache) > CACHE_SIZE:
                 _cache.popitem(last=False)
-    return {"query": query, "suggested_servings": servings, "products": products}
+            pending.products = copy.deepcopy(products)
+        return _packaged_result(query, servings, products)
+    except Exception as error:
+        pending.error = str(error) if isinstance(error, FoodLookupError) else "The food lookup couldn't finish. Enter the label manually or try later."
+        raise
+    finally:
+        with _lock:
+            _inflight.pop(cache_key, None)
+            pending.done.set()

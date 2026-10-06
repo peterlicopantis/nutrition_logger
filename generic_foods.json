@@ -1,0 +1,1142 @@
+{
+  "source_name": "USDA FoodData Central",
+  "data_type": "SR Legacy",
+  "release": "April 2018",
+  "basis": "100 g edible portion",
+  "verified_on": "2026-10-06",
+  "dataset_url": "https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_sr_legacy_food_csv_2018-04.zip",
+  "documentation_url": "https://www.ars.usda.gov/ARSUserFiles/80400525/Data/SR-Legacy/SR-Legacy_Doc.pdf",
+  "nutrient_ids": {
+    "calories": 1008,
+    "protein": 1003,
+    "carbs": 1005,
+    "fat": 1004,
+    "fiber": 1079
+  },
+  "notes": "Values copied from USDA food_nutrient.csv for the FDC IDs below. Apple 171688 was additionally verified through the official USDA food API. Carbohydrates include dietary fiber. Reference values describe these foods and preparations, not an exact individual item. Household weights copied from food_portion.csv in the same release; source_amount and source_modifier preserve the original measure. Portion weights estimate edible amounts, excluding inedible peel, pits, bones or shells. Defaults use a typical item where supported, otherwise a named household measure.",
+  "foods": [
+    {
+      "fdc_id": 170393,
+      "name": "Carrots, raw",
+      "aliases": [
+        "carrot",
+        "carrots",
+        "raw carrot",
+        "raw carrots",
+        "carrot raw",
+        "carrots raw"
+      ],
+      "calories": 41,
+      "protein": 0.93,
+      "carbs": 9.58,
+      "fat": 0.24,
+      "fiber": 2.8,
+      "portions": [
+        {
+          "id": "86559",
+          "label": "1 medium carrot",
+          "grams": 61.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "medium",
+          "size": "medium"
+        },
+        {
+          "id": "86560",
+          "label": "1 small carrot",
+          "grams": 50.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "small (5-1/2\" long)",
+          "size": "small"
+        },
+        {
+          "id": "86558",
+          "label": "1 large carrot",
+          "grams": 72.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "large (7-1/4\" to 8-/1/2\" long)",
+          "size": "large"
+        },
+        {
+          "id": "86555",
+          "label": "1 cup chopped",
+          "grams": 128.0,
+          "countable": false,
+          "source_amount": 1.0,
+          "source_modifier": "cup chopped"
+        },
+        {
+          "id": "86556",
+          "label": "1 cup grated",
+          "grams": 110.0,
+          "countable": false,
+          "source_amount": 1.0,
+          "source_modifier": "cup grated"
+        }
+      ],
+      "default_portion_id": "86559"
+    },
+    {
+      "fdc_id": 170394,
+      "name": "Carrots, cooked, boiled, drained, without salt",
+      "aliases": [
+        "carrot",
+        "carrots",
+        "cooked carrot",
+        "cooked carrots",
+        "carrot cooked",
+        "carrots cooked",
+        "boiled carrot",
+        "boiled carrots"
+      ],
+      "calories": 35,
+      "protein": 0.76,
+      "carbs": 8.22,
+      "fat": 0.18,
+      "fiber": 3,
+      "portions": [
+        {
+          "id": "86566",
+          "label": "1 cooked carrot",
+          "grams": 46.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "carrot"
+        },
+        {
+          "id": "86565",
+          "label": "1/2 cup slices",
+          "grams": 78.0,
+          "countable": false,
+          "source_amount": 0.5,
+          "source_modifier": "cup slices"
+        },
+        {
+          "id": "86564",
+          "label": "1 tablespoon",
+          "grams": 9.7,
+          "countable": false,
+          "source_amount": 1.0,
+          "source_modifier": "tbsp"
+        }
+      ],
+      "default_portion_id": "86566"
+    },
+    {
+      "fdc_id": 171688,
+      "name": "Apples, raw, with skin",
+      "source_description": "Apples, raw, with skin (Includes foods for USDA's Food Distribution Program)",
+      "aliases": [
+        "apple",
+        "apples",
+        "raw apple",
+        "raw apples",
+        "apple with skin",
+        "apples with skin"
+      ],
+      "calories": 52,
+      "protein": 0.26,
+      "carbs": 13.81,
+      "fat": 0.17,
+      "fiber": 2.4,
+      "portions": [
+        {
+          "id": "89193",
+          "label": "1 medium apple",
+          "grams": 182.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "medium (3\" dia)",
+          "size": "medium"
+        },
+        {
+          "id": "89194",
+          "label": "1 small apple",
+          "grams": 149.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "small (2-3/4\" dia)",
+          "size": "small"
+        },
+        {
+          "id": "89192",
+          "label": "1 large apple",
+          "grams": 223.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "large (3-1/4\" dia)",
+          "size": "large"
+        },
+        {
+          "id": "89195",
+          "label": "1 extra small apple",
+          "grams": 101.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "extra small (2-1/2\" dia)",
+          "size": "extra small"
+        },
+        {
+          "id": "89190",
+          "label": "1 cup chopped",
+          "grams": 125.0,
+          "countable": false,
+          "source_amount": 1.0,
+          "source_modifier": "cup, quartered or chopped"
+        },
+        {
+          "id": "89191",
+          "label": "1 cup slices",
+          "grams": 109.0,
+          "countable": false,
+          "source_amount": 1.0,
+          "source_modifier": "cup slices"
+        }
+      ],
+      "default_portion_id": "89193"
+    },
+    {
+      "fdc_id": 173944,
+      "name": "Bananas, raw",
+      "aliases": [
+        "banana",
+        "bananas",
+        "raw banana",
+        "raw bananas"
+      ],
+      "calories": 89,
+      "protein": 1.09,
+      "carbs": 22.84,
+      "fat": 0.33,
+      "fiber": 2.6,
+      "portions": [
+        {
+          "id": "93515",
+          "label": "1 medium banana",
+          "grams": 118.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "medium (7\" to 7-7/8\" long)",
+          "size": "medium"
+        },
+        {
+          "id": "93514",
+          "label": "1 small banana",
+          "grams": 101.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "small (6\" to 6-7/8\" long)",
+          "size": "small"
+        },
+        {
+          "id": "93516",
+          "label": "1 large banana",
+          "grams": 136.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "large (8\" to 8-7/8\" long)",
+          "size": "large"
+        },
+        {
+          "id": "93513",
+          "label": "1 extra small banana",
+          "grams": 81.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "extra small (less than 6\" long)",
+          "size": "extra small"
+        },
+        {
+          "id": "93517",
+          "label": "1 extra large banana",
+          "grams": 152.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "extra large (9\" or longer)",
+          "size": "extra large"
+        },
+        {
+          "id": "93512",
+          "label": "1 cup sliced",
+          "grams": 150.0,
+          "countable": false,
+          "source_amount": 1.0,
+          "source_modifier": "cup, sliced"
+        },
+        {
+          "id": "93511",
+          "label": "1 cup mashed",
+          "grams": 225.0,
+          "countable": false,
+          "source_amount": 1.0,
+          "source_modifier": "cup, mashed"
+        }
+      ],
+      "default_portion_id": "93515"
+    },
+    {
+      "fdc_id": 170379,
+      "name": "Broccoli, raw",
+      "aliases": [
+        "broccoli",
+        "raw broccoli",
+        "broccoli raw"
+      ],
+      "calories": 34,
+      "protein": 2.82,
+      "carbs": 6.64,
+      "fat": 0.37,
+      "fiber": 2.6,
+      "portions": [
+        {
+          "id": "86528",
+          "label": "1 cup chopped",
+          "grams": 91.0,
+          "countable": false,
+          "source_amount": 1.0,
+          "source_modifier": "cup chopped"
+        },
+        {
+          "id": "86531",
+          "label": "1 stalk",
+          "grams": 151.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "stalk"
+        },
+        {
+          "id": "86530",
+          "label": "1 spear",
+          "grams": 31.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "spear (about 5\" long)"
+        },
+        {
+          "id": "86529",
+          "label": "1 bunch",
+          "grams": 608.0,
+          "countable": false,
+          "source_amount": 1.0,
+          "source_modifier": "bunch"
+        }
+      ],
+      "default_portion_id": "86528"
+    },
+    {
+      "fdc_id": 168462,
+      "name": "Spinach, raw",
+      "aliases": [
+        "spinach",
+        "raw spinach",
+        "spinach raw"
+      ],
+      "calories": 23,
+      "protein": 2.86,
+      "carbs": 3.63,
+      "fat": 0.39,
+      "fiber": 2.2,
+      "portions": [
+        {
+          "id": "83132",
+          "label": "1 cup",
+          "grams": 30.0,
+          "countable": false,
+          "source_amount": 1.0,
+          "source_modifier": "cup"
+        },
+        {
+          "id": "83134",
+          "label": "1 leaf",
+          "grams": 10.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "leaf"
+        },
+        {
+          "id": "83133",
+          "label": "1 bunch",
+          "grams": 340.0,
+          "countable": false,
+          "source_amount": 1.0,
+          "source_modifier": "bunch"
+        }
+      ],
+      "default_portion_id": "83132"
+    },
+    {
+      "fdc_id": 170026,
+      "name": "Potatoes, flesh and skin, raw",
+      "aliases": [
+        "potato",
+        "potatoes",
+        "raw potato",
+        "raw potatoes",
+        "potato raw",
+        "potatoes raw"
+      ],
+      "calories": 77,
+      "protein": 2.05,
+      "carbs": 17.49,
+      "fat": 0.09,
+      "fiber": 2.1,
+      "portions": [
+        {
+          "id": "85919",
+          "label": "1 medium potato",
+          "grams": 213.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "Potato medium (2-1/4\" to 3-1/4\" dia)",
+          "size": "medium"
+        },
+        {
+          "id": "85920",
+          "label": "1 small potato",
+          "grams": 170.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "Potato small (1-3/4\" to 2-1/2\" dia)",
+          "size": "small"
+        },
+        {
+          "id": "85918",
+          "label": "1 large potato",
+          "grams": 369.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "Potato large (3\" to 4-1/4\" dia)",
+          "size": "large"
+        },
+        {
+          "id": "85917",
+          "label": "1/2 cup diced",
+          "grams": 75.0,
+          "countable": false,
+          "source_amount": 0.5,
+          "source_modifier": "cup, diced"
+        }
+      ],
+      "default_portion_id": "85919"
+    },
+    {
+      "fdc_id": 170438,
+      "name": "Potatoes, boiled, cooked in skin, flesh, without salt",
+      "aliases": [
+        "potato",
+        "potatoes",
+        "cooked potato",
+        "cooked potatoes",
+        "boiled potato",
+        "boiled potatoes"
+      ],
+      "calories": 87,
+      "protein": 1.87,
+      "carbs": 20.13,
+      "fat": 0.1,
+      "fiber": 1.8,
+      "portions": [
+        {
+          "id": "86649",
+          "label": "1 boiled potato (2-1/2 inch diameter)",
+          "grams": 136.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "potato (2-1/2\" dia, sphere)"
+        },
+        {
+          "id": "86648",
+          "label": "1/2 cup",
+          "grams": 78.0,
+          "countable": false,
+          "source_amount": 0.5,
+          "source_modifier": "cup"
+        }
+      ],
+      "default_portion_id": "86649"
+    },
+    {
+      "fdc_id": 171287,
+      "name": "Egg, whole, raw, fresh",
+      "aliases": [
+        "egg",
+        "eggs",
+        "raw egg",
+        "raw eggs",
+        "whole egg",
+        "whole eggs"
+      ],
+      "calories": 143,
+      "protein": 12.56,
+      "carbs": 0.72,
+      "fat": 9.51,
+      "fiber": 0,
+      "portions": [
+        {
+          "id": "88374",
+          "label": "1 large egg",
+          "grams": 50.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "large",
+          "size": "large"
+        },
+        {
+          "id": "88378",
+          "label": "1 medium egg",
+          "grams": 44.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "medium",
+          "size": "medium"
+        },
+        {
+          "id": "88379",
+          "label": "1 small egg",
+          "grams": 38.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "small",
+          "size": "small"
+        },
+        {
+          "id": "88375",
+          "label": "1 extra large egg",
+          "grams": 56.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "extra large",
+          "size": "extra large"
+        },
+        {
+          "id": "88376",
+          "label": "1 jumbo egg",
+          "grams": 63.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "jumbo",
+          "size": "jumbo"
+        },
+        {
+          "id": "88377",
+          "label": "1 cup",
+          "grams": 243.0,
+          "countable": false,
+          "source_amount": 1.0,
+          "source_modifier": "cup (4.86 large eggs)"
+        }
+      ],
+      "default_portion_id": "88374"
+    },
+    {
+      "fdc_id": 173424,
+      "name": "Egg, whole, cooked, hard-boiled",
+      "aliases": [
+        "egg",
+        "eggs",
+        "boiled egg",
+        "boiled eggs",
+        "hard boiled egg",
+        "hard boiled eggs",
+        "hard-boiled egg",
+        "hard-boiled eggs"
+      ],
+      "calories": 155,
+      "protein": 12.58,
+      "carbs": 1.12,
+      "fat": 10.61,
+      "fiber": 0,
+      "portions": [
+        {
+          "id": "92500",
+          "label": "1 large hard-boiled egg",
+          "grams": 50.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "large",
+          "size": "large"
+        },
+        {
+          "id": "92498",
+          "label": "1 cup chopped",
+          "grams": 136.0,
+          "countable": false,
+          "source_amount": 1.0,
+          "source_modifier": "cup, chopped"
+        },
+        {
+          "id": "92499",
+          "label": "1 tablespoon",
+          "grams": 8.5,
+          "countable": false,
+          "source_amount": 1.0,
+          "source_modifier": "tbsp"
+        }
+      ],
+      "default_portion_id": "92500"
+    },
+    {
+      "fdc_id": 168878,
+      "name": "Rice, white, long-grain, enriched, cooked",
+      "source_description": "Rice, white, long-grain, regular, enriched, cooked",
+      "aliases": [
+        "rice",
+        "white rice",
+        "cooked rice",
+        "cooked white rice",
+        "white rice cooked",
+        "rice cooked"
+      ],
+      "calories": 130,
+      "protein": 2.69,
+      "carbs": 28.17,
+      "fat": 0.28,
+      "fiber": 0.4,
+      "portions": [
+        {
+          "id": "83928",
+          "label": "1 cup cooked rice",
+          "grams": 158.0,
+          "countable": false,
+          "source_amount": 1.0,
+          "source_modifier": "cup"
+        }
+      ],
+      "default_portion_id": "83928"
+    },
+    {
+      "fdc_id": 171477,
+      "name": "Chicken breast, meat only, roasted",
+      "source_description": "Chicken, broilers or fryers, breast, meat only, cooked, roasted",
+      "aliases": [
+        "chicken",
+        "chicken breast",
+        "roasted chicken breast",
+        "cooked chicken breast",
+        "chicken breast roasted"
+      ],
+      "calories": 165,
+      "protein": 31.02,
+      "carbs": 0,
+      "fat": 3.57,
+      "fiber": 0,
+      "portions": [
+        {
+          "id": "88819",
+          "label": "1/2 breast, bone and skin removed",
+          "grams": 86.0,
+          "countable": false,
+          "source_amount": 0.5,
+          "source_modifier": "breast, bone and skin removed"
+        },
+        {
+          "id": "88817",
+          "label": "1 cup chopped or diced",
+          "grams": 140.0,
+          "countable": false,
+          "source_amount": 1.0,
+          "source_modifier": "cup, chopped or diced"
+        }
+      ],
+      "default_portion_id": "88819"
+    },
+    {
+      "fdc_id": 168409,
+      "name": "Cucumber, with peel, raw",
+      "aliases": [
+        "cucumber",
+        "cucumbers",
+        "raw cucumber",
+        "raw cucumbers"
+      ],
+      "calories": 15,
+      "protein": 0.65,
+      "carbs": 3.63,
+      "fat": 0.11,
+      "fiber": 0.5,
+      "portions": [
+        {
+          "id": "83050",
+          "label": "1 cucumber (8-1/4 inches long)",
+          "grams": 301.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "cucumber (8-1/4\")"
+        },
+        {
+          "id": "83049",
+          "label": "1/2 cup slices",
+          "grams": 52.0,
+          "countable": false,
+          "source_amount": 0.5,
+          "source_modifier": "cup slices"
+        }
+      ],
+      "default_portion_id": "83050"
+    },
+    {
+      "fdc_id": 170457,
+      "name": "Tomatoes, red, ripe, raw",
+      "source_description": "Tomatoes, red, ripe, raw, year round average",
+      "aliases": [
+        "tomato",
+        "tomatoes",
+        "raw tomato",
+        "raw tomatoes"
+      ],
+      "calories": 18,
+      "protein": 0.88,
+      "carbs": 3.89,
+      "fat": 0.2,
+      "fiber": 1.2,
+      "portions": [
+        {
+          "id": "86686",
+          "label": "1 medium tomato",
+          "grams": 123.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "medium whole (2-3/5\" dia)",
+          "size": "medium"
+        },
+        {
+          "id": "86689",
+          "label": "1 small tomato",
+          "grams": 91.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "small whole (2-2/5\" dia)",
+          "size": "small"
+        },
+        {
+          "id": "86685",
+          "label": "1 large tomato",
+          "grams": 182.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "large whole (3\" dia)",
+          "size": "large"
+        },
+        {
+          "id": "86684",
+          "label": "1 cherry tomato",
+          "grams": 17.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "cherry"
+        },
+        {
+          "id": "86688",
+          "label": "1 plum tomato",
+          "grams": 62.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "plum tomato"
+        },
+        {
+          "id": "86682",
+          "label": "1 cup chopped or sliced",
+          "grams": 180.0,
+          "countable": false,
+          "source_amount": 1.0,
+          "source_modifier": "cup, chopped or sliced"
+        }
+      ],
+      "default_portion_id": "86686"
+    },
+    {
+      "fdc_id": 170000,
+      "name": "Onions, raw",
+      "aliases": [
+        "onion",
+        "onions",
+        "raw onion",
+        "raw onions"
+      ],
+      "calories": 40,
+      "protein": 1.1,
+      "carbs": 9.34,
+      "fat": 0.1,
+      "fiber": 1.7,
+      "portions": [
+        {
+          "id": "85860",
+          "label": "1 medium onion",
+          "grams": 110.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "medium (2-1/2\" dia)",
+          "size": "medium"
+        },
+        {
+          "id": "85862",
+          "label": "1 small onion",
+          "grams": 70.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "small",
+          "size": "small"
+        },
+        {
+          "id": "85858",
+          "label": "1 large onion",
+          "grams": 150.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "large",
+          "size": "large"
+        },
+        {
+          "id": "85855",
+          "label": "1 cup chopped",
+          "grams": 160.0,
+          "countable": false,
+          "source_amount": 1.0,
+          "source_modifier": "cup, chopped"
+        },
+        {
+          "id": "85856",
+          "label": "1 cup sliced",
+          "grams": 115.0,
+          "countable": false,
+          "source_amount": 1.0,
+          "source_modifier": "cup, sliced"
+        }
+      ],
+      "default_portion_id": "85860"
+    },
+    {
+      "fdc_id": 170420,
+      "name": "Peas, green, boiled, drained, without salt",
+      "source_description": "Peas, green, cooked, boiled, drained, without salt",
+      "aliases": [
+        "peas",
+        "green peas",
+        "cooked peas",
+        "boiled peas"
+      ],
+      "calories": 84,
+      "protein": 5.36,
+      "carbs": 15.63,
+      "fat": 0.22,
+      "fiber": 5.5,
+      "portions": [
+        {
+          "id": "86614",
+          "label": "1 cup cooked peas",
+          "grams": 160.0,
+          "countable": false,
+          "source_amount": 1.0,
+          "source_modifier": "cup"
+        }
+      ],
+      "default_portion_id": "86614"
+    },
+    {
+      "fdc_id": 167762,
+      "name": "Strawberries, raw",
+      "aliases": [
+        "strawberry",
+        "strawberries",
+        "raw strawberry",
+        "raw strawberries"
+      ],
+      "calories": 32,
+      "protein": 0.67,
+      "carbs": 7.68,
+      "fat": 0.3,
+      "fiber": 2,
+      "portions": [
+        {
+          "id": "81925",
+          "label": "1 medium strawberry",
+          "grams": 12.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "medium (1-1/4\" dia)",
+          "size": "medium"
+        },
+        {
+          "id": "81927",
+          "label": "1 small strawberry",
+          "grams": 7.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "small (1\" dia)",
+          "size": "small"
+        },
+        {
+          "id": "81924",
+          "label": "1 large strawberry",
+          "grams": 18.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "large (1-3/8\" dia)",
+          "size": "large"
+        },
+        {
+          "id": "81923",
+          "label": "1 extra large strawberry",
+          "grams": 27.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "extra large (1-5/8\" dia)",
+          "size": "extra large"
+        },
+        {
+          "id": "81922",
+          "label": "1 cup whole",
+          "grams": 144.0,
+          "countable": false,
+          "source_amount": 1.0,
+          "source_modifier": "cup, whole"
+        },
+        {
+          "id": "81919",
+          "label": "1 cup halves",
+          "grams": 152.0,
+          "countable": false,
+          "source_amount": 1.0,
+          "source_modifier": "cup, halves"
+        }
+      ],
+      "default_portion_id": "81925"
+    },
+    {
+      "fdc_id": 169097,
+      "name": "Oranges, raw, all commercial varieties",
+      "aliases": [
+        "orange",
+        "oranges",
+        "raw orange",
+        "raw oranges"
+      ],
+      "calories": 47,
+      "protein": 0.94,
+      "carbs": 11.75,
+      "fat": 0.12,
+      "fiber": 2.4,
+      "portions": [
+        {
+          "id": "84230",
+          "label": "1 orange (2-5/8 inch diameter)",
+          "grams": 131.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "fruit (2-5/8\" dia)"
+        },
+        {
+          "id": "84229",
+          "label": "1 small orange",
+          "grams": 96.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "small (2-3/8\" dia)",
+          "size": "small"
+        },
+        {
+          "id": "84228",
+          "label": "1 large orange",
+          "grams": 184.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "large (3-1/16\" dia)",
+          "size": "large"
+        },
+        {
+          "id": "84227",
+          "label": "1 cup sections",
+          "grams": 180.0,
+          "countable": false,
+          "source_amount": 1.0,
+          "source_modifier": "cup, sections"
+        }
+      ],
+      "default_portion_id": "84230"
+    },
+    {
+      "fdc_id": 171705,
+      "name": "Avocados, raw, all commercial varieties",
+      "aliases": [
+        "avocado",
+        "avocados",
+        "raw avocado",
+        "raw avocados"
+      ],
+      "calories": 160,
+      "protein": 2,
+      "carbs": 8.53,
+      "fat": 14.66,
+      "fiber": 6.7,
+      "portions": [
+        {
+          "id": "89226",
+          "label": "1 avocado",
+          "grams": 201.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "avocado, NS as to Florida or California"
+        },
+        {
+          "id": "89223",
+          "label": "1 cup cubes",
+          "grams": 150.0,
+          "countable": false,
+          "source_amount": 1.0,
+          "source_modifier": "cup, cubes"
+        },
+        {
+          "id": "89225",
+          "label": "1 cup sliced",
+          "grams": 146.0,
+          "countable": false,
+          "source_amount": 1.0,
+          "source_modifier": "cup, sliced"
+        },
+        {
+          "id": "89224",
+          "label": "1 cup pureed",
+          "grams": 230.0,
+          "countable": false,
+          "source_amount": 1.0,
+          "source_modifier": "cup, pureed"
+        }
+      ],
+      "default_portion_id": "89226"
+    },
+    {
+      "fdc_id": 169249,
+      "name": "Lettuce, green leaf, raw",
+      "aliases": [
+        "lettuce",
+        "green leaf lettuce",
+        "raw lettuce"
+      ],
+      "calories": 15,
+      "protein": 1.36,
+      "carbs": 2.87,
+      "fat": 0.15,
+      "fiber": 1.3,
+      "portions": [
+        {
+          "id": "84520",
+          "label": "1 cup shredded",
+          "grams": 36.0,
+          "countable": false,
+          "source_amount": 1.0,
+          "source_modifier": "cup shredded"
+        },
+        {
+          "id": "84521",
+          "label": "1 head",
+          "grams": 360.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "head"
+        },
+        {
+          "id": "84522",
+          "label": "1 inner leaf",
+          "grams": 4.8,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "leaf inner"
+        },
+        {
+          "id": "84523",
+          "label": "1 outer leaf",
+          "grams": 24.0,
+          "countable": true,
+          "source_amount": 1.0,
+          "source_modifier": "leaf outer"
+        }
+      ],
+      "default_portion_id": "84520"
+    },
+    {
+      "fdc_id": 171265,
+      "name": "Milk, whole, 3.25% milkfat, with vitamin D",
+      "source_description": "Milk, whole, 3.25% milkfat, with added vitamin D",
+      "aliases": [
+        "whole milk",
+        "whole dairy milk"
+      ],
+      "calories": 61,
+      "protein": 3.15,
+      "carbs": 4.8,
+      "fat": 3.25,
+      "fiber": 0,
+      "portions": [
+        {
+          "id": "88314",
+          "label": "1 cup",
+          "grams": 244.0,
+          "countable": false,
+          "source_amount": 1.0,
+          "source_modifier": "cup"
+        },
+        {
+          "id": "88315",
+          "label": "1 fluid ounce",
+          "grams": 30.5,
+          "countable": false,
+          "source_amount": 1.0,
+          "source_modifier": "fl oz"
+        },
+        {
+          "id": "88316",
+          "label": "1 tablespoon",
+          "grams": 15.0,
+          "countable": false,
+          "source_amount": 1.0,
+          "source_modifier": "tbsp"
+        }
+      ],
+      "default_portion_id": "88314"
+    },
+    {
+      "fdc_id": 171284,
+      "name": "Yogurt, plain, whole milk",
+      "aliases": [
+        "plain whole milk yogurt",
+        "plain whole milk yoghurt",
+        "whole milk yogurt",
+        "whole milk yoghurt"
+      ],
+      "calories": 61,
+      "protein": 3.47,
+      "carbs": 4.66,
+      "fat": 3.25,
+      "fiber": 0,
+      "portions": [
+        {
+          "id": "88362",
+          "label": "1 container (6 oz)",
+          "grams": 170.0,
+          "countable": false,
+          "source_amount": 1.0,
+          "source_modifier": "container (6 oz)"
+        },
+        {
+          "id": "88363",
+          "label": "1 container (8 oz)",
+          "grams": 227.0,
+          "countable": false,
+          "source_amount": 1.0,
+          "source_modifier": "container (8 oz)"
+        },
+        {
+          "id": "88365",
+          "label": "1 cup",
+          "grams": 245.0,
+          "countable": false,
+          "source_amount": 1.0,
+          "source_modifier": "cup (8 fl oz)"
+        }
+      ],
+      "default_portion_id": "88362"
+    }
+  ]
+}
