@@ -46,6 +46,22 @@ You need Python 3.11+ installed.
 
 Your foods and logs live inside this folder, so don't delete `foods.json` or `melb.db`.
 
+### Start automatically on Windows
+
+After setup, double-click ENABLE_AUTOSTART.bat once. It adds a shortcut to
+your current Windows user's Startup folder. MELB then runs silently when you
+sign in; VS Code and a command window are not needed. Open
+http://127.0.0.1:8501 on the PC or your existing phone address.
+
+Startup errors are saved in logs/startup.log. Logs stay local and are ignored
+by Git. The launcher exits if MELB is already running. Keep this project folder
+in place; rerun ENABLE_AUTOSTART.bat if you move it.
+
+To disable automatic startup, press Win+R, enter shell:startup, and remove
+the MELB Nutrition shortcut. This does not stop a currently running instance.
+The app is unavailable while the PC is shut down or asleep, and starts after
+Windows sign-in rather than before sign-in.
+
 ## 2. Open it on the iPhone at home
 
 The PC and iPhone need to be on the same Wi-Fi.

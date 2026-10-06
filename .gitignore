@@ -3,3 +3,4 @@ melb.db-*
 __pycache__/
 *.pyc
 *.pyo
+logs/
