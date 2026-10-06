@@ -1,13 +1,20 @@
 from __future__ import annotations
 
 import json
+import math
 import os
+import re
 import secrets
 import sqlite3
+from contextlib import contextmanager
+from collections.abc import Iterator
 from datetime import date, datetime
 from pathlib import Path
+from urllib.parse import urlparse
 
 from flask import Flask, jsonify, redirect, render_template, request, url_for
+
+from food_lookup import FoodLookupError, lookup_foods
 
 BASE_DIR = Path(__file__).resolve().parent
 FOODS_PATH = BASE_DIR / "foods.json"
@@ -45,10 +52,15 @@ def save_config(cfg: dict) -> None:
     CONFIG_PATH.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
 
 
-def db() -> sqlite3.Connection:
+@contextmanager
+def db() -> Iterator[sqlite3.Connection]:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-    return conn
+    try:
+        with conn:
+            yield conn
+    finally:
+        conn.close()
 
 
 def init_db() -> None:
@@ -64,6 +76,25 @@ def init_db() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS day_foods (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                day TEXT NOT NULL,
+                name TEXT NOT NULL,
+                serving_label TEXT NOT NULL,
+                servings REAL NOT NULL,
+                calories REAL NOT NULL,
+                protein REAL NOT NULL,
+                carbs REAL NOT NULL,
+                fat REAL NOT NULL,
+                fiber REAL,
+                source_url TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS day_foods_day ON day_foods(day)")
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS health_snapshots (
@@ -137,6 +168,164 @@ def totals_for(foods: dict, amounts: dict[str, float]) -> dict[str, float]:
     return {k: round(v, 2) for k, v in totals.items()}
 
 
+def load_day_foods(day: str) -> list[dict]:
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM day_foods WHERE day = ? ORDER BY id", (day,)
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def day_food_totals_for(entries: list[dict]) -> dict[str, float]:
+    # Rows preserve nutrition for one serving at the time they were logged.
+    foods = {}
+    amounts = {}
+    for entry in entries:
+        key = str(entry["id"])
+        foods[key] = {
+            "cal_per_g": entry["calories"],
+            "protein_per_g": entry["protein"],
+            "carbs_per_g": entry["carbs"],
+            "fat_per_g": entry["fat"],
+            "fiber_per_g": entry["fiber"],
+        }
+        amounts[key] = entry["servings"]
+    return totals_for(foods, amounts)
+
+
+def combined_totals(foods: dict, amounts: dict, day_foods: list[dict]) -> dict:
+    regular = totals_for(foods, amounts)
+    extra = day_food_totals_for(day_foods)
+    return {key: round(value + extra[key], 2) for key, value in regular.items()}
+
+
+def day_totals_for(day: str, foods: dict | None = None) -> dict:
+    return combined_totals(
+        foods if foods is not None else load_foods(),
+        load_amounts(day),
+        load_day_foods(day),
+    )
+
+
+def required_day(payload: dict) -> str:
+    raw = payload.get("day")
+    if not isinstance(raw, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", raw):
+        raise ValueError("Choose a valid date for this food.")
+    try:
+        return date.fromisoformat(raw).isoformat()
+    except ValueError:
+        raise ValueError("Choose a valid date for this food.") from None
+
+
+def nutrition_number(payload: dict, key: str, optional: bool = False) -> float | None:
+    value = payload.get(key)
+    if optional and value in (None, ""):
+        return None
+    if value is None or isinstance(value, bool):
+        raise ValueError(f"Enter a valid number for {key}.")
+    try:
+        number = float(value)
+    except (TypeError, ValueError, OverflowError):
+        raise ValueError(f"Enter a valid number for {key}.") from None
+    if not math.isfinite(number) or number < 0 or number > 1_000_000:
+        raise ValueError(f"{key.capitalize()} must be a finite number from 0 to 1,000,000.")
+    return number
+
+
+def day_food_response(day: str, **extra):
+    return jsonify(
+        ok=True,
+        totals=day_totals_for(day),
+        day_food_totals=day_food_totals_for(load_day_foods(day)),
+        **extra,
+    )
+
+
+@app.get("/api/food-lookup")
+def api_food_lookup():
+    query = request.args.get("q", "").strip()
+    if not query or len(query) > 250:
+        return jsonify(ok=False, error="Enter a food name, a short description, or a barcode (up to 250 characters)."), 400
+    try:
+        result = lookup_foods(query)
+    except FoodLookupError as exc:
+        return jsonify(ok=False, error=str(exc)), 503
+    return jsonify(ok=True, **result)
+
+
+@app.post("/api/day-food")
+def api_add_day_food():
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify(ok=False, error="Send the food details as JSON."), 400
+    try:
+        day = required_day(payload)
+        name = payload.get("name", "")
+        serving_label = payload.get("serving_label", "1 serving")
+        if not isinstance(name, str) or not name.strip() or len(name.strip()) > 160:
+            raise ValueError("Enter a food name (up to 160 characters).")
+        if not isinstance(serving_label, str) or not serving_label.strip() or len(serving_label.strip()) > 120:
+            raise ValueError("Enter a serving description (up to 120 characters).")
+        servings = nutrition_number(payload, "servings")
+        if servings <= 0:
+            raise ValueError("Servings must be greater than zero.")
+        nutrition = {key: nutrition_number(payload, key) for key in ("calories", "protein", "carbs", "fat")}
+        nutrition["fiber"] = nutrition_number(payload, "fiber", optional=True)
+        source_url = payload.get("source_url") or ""
+        if not isinstance(source_url, str):
+            raise ValueError("Invalid nutrition source.")
+        if source_url:
+            source = urlparse(source_url)
+            if (
+                source.scheme != "https"
+                or source.netloc != "world.openfoodfacts.org"
+                or not re.fullmatch(r"/product/\d{8,14}", source.path)
+                or source.query
+                or source.fragment
+            ):
+                raise ValueError("Invalid nutrition source.")
+    except ValueError as exc:
+        return jsonify(ok=False, error=str(exc)), 400
+
+    init_db()
+    with db() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO day_foods(
+                day, name, serving_label, servings, calories, protein, carbs, fat,
+                fiber, source_url, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                day, name.strip(), serving_label.strip(), servings,
+                nutrition["calories"], nutrition["protein"], nutrition["carbs"],
+                nutrition["fat"], nutrition["fiber"], source_url,
+                datetime.now().isoformat(timespec="seconds"),
+            ),
+        )
+        entry = dict(conn.execute("SELECT * FROM day_foods WHERE id = ?", (cursor.lastrowid,)).fetchone())
+    return day_food_response(day, entry=entry)
+
+
+@app.delete("/api/day-food/<int:entry_id>")
+def api_remove_day_food(entry_id: int):
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify(ok=False, error="Send the selected date as JSON."), 400
+    try:
+        day = required_day(payload)
+    except ValueError as exc:
+        return jsonify(ok=False, error=str(exc)), 400
+    init_db()
+    with db() as conn:
+        cursor = conn.execute(
+            "DELETE FROM day_foods WHERE id = ? AND day = ?", (entry_id, day)
+        )
+    if not cursor.rowcount:
+        return jsonify(ok=False, error="That food was not found on this date."), 404
+    return day_food_response(day)
+
+
 def latest_health_snapshot(day: str):
     with db() as conn:
         row = conn.execute(
@@ -171,7 +360,8 @@ def dashboard():
             }
         )
 
-    totals = totals_for(foods, amounts)
+    day_foods = load_day_foods(day)
+    totals = combined_totals(foods, amounts, day_foods)
     snapshot = latest_health_snapshot(day)
     balance = None
     if snapshot:
@@ -184,6 +374,8 @@ def dashboard():
         "dashboard.html",
         day=day,
         grouped=grouped,
+        day_foods=day_foods,
+        day_food_totals=day_food_totals_for(day_foods),
         totals=totals,
         shortcut_name=cfg["shortcut_name"],
         health_snapshot=snapshot,
@@ -198,8 +390,10 @@ def api_entry():
     day = safe_day(payload.get("day"))
     food_name = str(payload.get("food_name", ""))
     try:
-        amount = max(0.0, float(payload.get("amount", 0)))
-    except (TypeError, ValueError):
+        amount = float(payload.get("amount", 0))
+        if not math.isfinite(amount) or amount < 0:
+            raise ValueError("Invalid amount")
+    except (TypeError, ValueError, OverflowError):
         return jsonify({"ok": False, "error": "Invalid amount"}), 400
 
     foods = load_foods()
@@ -224,14 +418,16 @@ def api_entry():
             )
 
     # Return authoritative totals so the UI stays in sync.
-    return jsonify({"ok": True, "totals": totals_for(foods, load_amounts(day))})
+    return jsonify({"ok": True, "totals": day_totals_for(day, foods)})
 
 
 @app.post("/reset")
 def reset_day():
+    init_db()
     day = safe_day(request.form.get("day"))
     with db() as conn:
         conn.execute("DELETE FROM daily_entries WHERE day = ?", (day,))
+        conn.execute("DELETE FROM day_foods WHERE day = ?", (day,))
     return redirect(url_for("dashboard", day=day))
 
 
@@ -307,7 +503,7 @@ def api_health_snapshot():
             return None
         try:
             return float(value)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             raise ValueError(key)
 
     try:

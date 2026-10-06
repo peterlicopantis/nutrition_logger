@@ -6,7 +6,7 @@
     <span>Date</span>
     <input id="dayPicker" type="date" value="{{ day }}">
   </label>
-  <span id="saveStatus" class="status">Saved</span>
+  <span id="saveStatus" class="status" role="status">Saved</span>
 </div>
 
 <div class="metrics">
@@ -17,6 +17,7 @@
   <div class="metric"><div class="v" id="mFiber">{{ "%.1f"|format(totals.fiber) }}g</div><div class="k">Fiber</div></div>
   <div class="metric"><div class="v" id="mCalc">{{ "%.0f"|format(totals.calc_calories) }}</div><div class="k">Calc calories</div></div>
 </div>
+<p id="fiberNotice" class="small" hidden>Some added foods have no fiber value. The fiber total includes known values only.</p>
 
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
   <button class="btn primary" id="healthButton" type="button">Send totals to Apple Health</button>
@@ -40,10 +41,58 @@
     <div class="metric"><div class="v">{{ health_snapshot.resting_calories if health_snapshot.resting_calories is not none else "—" }}</div><div class="k">Resting kcal</div></div>
     <div class="metric"><div class="v">{{ health_snapshot.steps|round|int if health_snapshot.steps is not none else "—" }}</div><div class="k">Steps</div></div>
     <div class="metric"><div class="v">{{ health_snapshot.weight if health_snapshot.weight is not none else "—" }}</div><div class="k">Weight</div></div>
-    <div class="metric"><div class="v">{{ energy_balance if energy_balance is not none else "—" }}</div><div class="k">Food − burn</div></div>
+    <div class="metric"><div class="v" id="healthEnergyBalance">{{ energy_balance if energy_balance is not none else "—" }}</div><div class="k">Food − burn</div></div>
   </div>
 </div>
 {% endif %}
+
+<section class="panel" aria-labelledby="dayFoodHeading">
+  <h2 id="dayFoodHeading" class="panel-title">Add food for this day</h2>
+  <p class="small">Look up a packaged food or enter macros you know. Entries are saved only to {{ day }}.</p>
+  <div class="food-tabs" aria-label="Food entry method">
+    <button id="lookupMode" class="btn" type="button" aria-pressed="true">Food lookup</button>
+    <button id="manualMode" class="btn" type="button" aria-pressed="false">Enter macros</button>
+  </div>
+  <div id="lookupArea">
+    <form id="lookupForm" class="lookup-controls">
+      <label>
+        <span>What did you eat?</span>
+        <input id="foodQuery" type="search" maxlength="200" required placeholder="I had a Rice Krispies treat" autocomplete="off">
+      </label>
+      <button id="lookupButton" class="btn primary" type="submit">Look up food</button>
+    </form>
+    <p class="small">Searches Open Food Facts. Choose the matching brand and serving size, then check the values against your package.</p>
+    <div id="lookupStatus" class="small" role="status" aria-live="polite"></div>
+    <div id="lookupResults" class="food-results" aria-label="Matching foods"></div>
+  </div>
+
+  <form id="dayFoodForm" hidden>
+    <h3 class="food-editor-heading">Macros per serving</h3>
+    <p id="portionNote" class="small">Enter the values for one serving, then how many servings you ate.</p>
+    <div id="basisWarning" class="notice food-warning" hidden></div>
+    <div class="day-food-grid">
+      <label class="food-name-field"><span>Food name</span><input id="dfName" name="name" maxlength="160" required></label>
+      <label><span>One serving is</span><input id="dfServingLabel" name="serving_label" value="1 serving" maxlength="120" required></label>
+      <label><span>Servings eaten</span><input id="dfServings" name="servings" type="number" inputmode="decimal" min="0.001" step="any" value="1" required></label>
+      <label><span>Calories (kcal)</span><input id="dfCalories" name="calories" type="number" inputmode="decimal" min="0" step="any" required></label>
+      <label><span>Protein (g)</span><input id="dfProtein" name="protein" type="number" inputmode="decimal" min="0" step="any" required></label>
+      <label><span>Carbs (g)</span><input id="dfCarbs" name="carbs" type="number" inputmode="decimal" min="0" step="any" required></label>
+      <label><span>Fat (g)</span><input id="dfFat" name="fat" type="number" inputmode="decimal" min="0" step="any" required></label>
+      <label><span>Fiber (g, optional)</span><input id="dfFiber" name="fiber" type="number" inputmode="decimal" min="0" step="any" placeholder="Unknown"></label>
+    </div>
+    <p id="foodSource" class="small" hidden></p>
+    <p id="foodPreview" class="notice" aria-live="polite">Fill in the macros to preview this entry.</p>
+    <div class="food-actions">
+      <button id="saveDayFood" class="btn primary" type="submit">Save to {{ day }}</button>
+      <button id="cancelDayFood" class="btn" type="button">Cancel</button>
+    </div>
+  </form>
+  <p id="dayFoodStatus" class="small" role="status" aria-live="polite"></p>
+
+  <h3 class="food-editor-heading">Added for {{ day }}</h3>
+  <p id="dayFoodEmpty" class="small">No extra foods added for this date yet.</p>
+  <ul id="dayFoodList" class="day-food-list" aria-label="Foods added for this date"></ul>
+</section>
 
 <div class="sections">
 {% for category, items in grouped.items() %}
@@ -61,6 +110,7 @@
             step="1"
             inputmode="decimal"
             value="{{ food.amount|round(2) if food.amount else '' }}"
+            aria-label="{{ food.name|e }} ({{ unit }})"
             data-name="{{ food.name|e }}"
             data-cal="{{ food.cal_per_g }}"
             data-protein="{{ food.protein_per_g }}"
@@ -79,8 +129,12 @@
 <script>
 const DAY = {{ day|tojson }};
 const SHORTCUT = {{ shortcut_name|tojson }};
+const HEALTH_BURN = {{ ((health_snapshot.active_calories + health_snapshot.resting_calories) if health_snapshot and health_snapshot.active_calories is not none and health_snapshot.resting_calories is not none else none)|tojson }};
 const inputs = [...document.querySelectorAll(".food-input")];
 const statusEl = document.getElementById("saveStatus");
+let dayFoods = {{ day_foods|default([], true)|tojson }};
+let dayFoodTotals = {{ day_food_totals|default({}, true)|tojson }};
+const nutrientKeys = ["calories", "protein", "carbs", "fat", "fiber"];
 
 function n(v) {
   const x = parseFloat(v);
@@ -90,8 +144,18 @@ function rounded(x, d=2) {
   const p = Math.pow(10,d);
   return Math.round((x + Number.EPSILON) * p) / p;
 }
+function computeDayFoodTotals() {
+  const t = {calories:0, protein:0, carbs:0, fat:0, fiber:0, calc_calories:0};
+  for (const food of dayFoods) {
+    const servings = n(food.servings);
+    nutrientKeys.forEach(key => t[key] += servings * n(food[key]));
+    t.calc_calories += servings * (4*n(food.protein) + 4*n(food.carbs) + 9*n(food.fat));
+  }
+  return t;
+}
 function computeTotals() {
   const t = {calories:0, protein:0, carbs:0, fat:0, fiber:0, calc_calories:0};
+  Object.keys(t).forEach(key => t[key] = n(dayFoodTotals[key]));
   for (const el of inputs) {
     const a = n(el.value);
     const p = n(el.dataset.protein), c = n(el.dataset.carbs), f = n(el.dataset.fat);
@@ -113,22 +177,29 @@ function renderTotals() {
   document.getElementById("mFat").textContent = t.fat.toFixed(1)+"g";
   document.getElementById("mFiber").textContent = t.fiber.toFixed(1)+"g";
   document.getElementById("mCalc").textContent = Math.round(t.calc_calories);
+  const energyBalance = document.getElementById("healthEnergyBalance");
+  if (energyBalance && HEALTH_BURN !== null) energyBalance.textContent = rounded(t.calories - HEALTH_BURN);
+  document.getElementById("fiberNotice").hidden = !dayFoods.some(food => food.fiber == null);
 }
 async function saveInput(el) {
   statusEl.textContent = "Saving…";
-  const res = await fetch("/api/entry", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({day:DAY, food_name:el.dataset.name, amount:n(el.value)})
-  });
-  statusEl.textContent = res.ok ? "Saved" : "Save failed";
+  try {
+    const res = await fetch("/api/entry", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({day:DAY, food_name:el.dataset.name, amount:n(el.value)})
+    });
+    statusEl.textContent = res.ok ? "Saved" : "Save failed — edit the amount to retry";
+  } catch (error) {
+    statusEl.textContent = "Save failed — check your connection and edit the amount to retry";
+  }
 }
 inputs.forEach(el => {
   el.addEventListener("input", renderTotals);
   el.addEventListener("change", () => saveInput(el));
 });
 document.getElementById("dayPicker").addEventListener("change", (e) => {
-  window.location.href = "/?day="+encodeURIComponent(e.target.value);
+  if (e.target.value) window.location.href = "/?day="+encodeURIComponent(e.target.value);
 });
 document.getElementById("healthButton").addEventListener("click", () => {
   const t = computeTotals();
@@ -145,6 +216,308 @@ document.getElementById("healthButton").addEventListener("click", () => {
             + "&input=text&text=" + encodeURIComponent(JSON.stringify(payload));
   window.location.href = url;
 });
+
+const lookupForm = document.getElementById("lookupForm");
+const lookupButton = document.getElementById("lookupButton");
+const lookupStatus = document.getElementById("lookupStatus");
+const lookupResults = document.getElementById("lookupResults");
+const dayFoodForm = document.getElementById("dayFoodForm");
+const dayFoodStatus = document.getElementById("dayFoodStatus");
+const saveDayFood = document.getElementById("saveDayFood");
+const fields = {
+  name:document.getElementById("dfName"),
+  serving_label:document.getElementById("dfServingLabel"),
+  servings:document.getElementById("dfServings"),
+  calories:document.getElementById("dfCalories"),
+  protein:document.getElementById("dfProtein"),
+  carbs:document.getElementById("dfCarbs"),
+  fat:document.getElementById("dfFat"),
+  fiber:document.getElementById("dfFiber")
+};
+let selectedSource = null;
+let savingFood = false;
+let lookupGeneration = 0;
+const removingFoods = new Set();
+
+function trustedSource(value) {
+  if (typeof value !== "string") return null;
+  try {
+    const url = new URL(value);
+    const allowedHost = url.hostname === "openfoodfacts.org" || url.hostname.endsWith(".openfoodfacts.org");
+    return url.protocol === "https:" && allowedHost && !url.username && !url.password ? url.href : null;
+  } catch (error) {
+    return null;
+  }
+}
+function addSourceLink(container, source) {
+  const href = trustedSource(source);
+  if (!href) return;
+  const link = document.createElement("a");
+  link.href = href;
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  link.textContent = "View on Open Food Facts";
+  container.appendChild(link);
+}
+function setFoodStatus(message, isError=false) {
+  dayFoodStatus.textContent = message;
+  dayFoodStatus.classList.toggle("food-error", isError);
+}
+function resetEditor() {
+  dayFoodForm.reset();
+  selectedSource = null;
+  document.getElementById("basisWarning").hidden = true;
+  document.getElementById("foodSource").replaceChildren();
+  document.getElementById("foodSource").hidden = true;
+  renderFoodPreview();
+}
+function chooseMode(manual) {
+  if (savingFood) return;
+  lookupGeneration++;
+  lookupStatus.textContent = "";
+  lookupStatus.classList.remove("food-error");
+  lookupButton.disabled = false;
+  lookupButton.textContent = "Look up food";
+  document.getElementById("lookupArea").hidden = manual;
+  document.getElementById("lookupMode").setAttribute("aria-pressed", String(!manual));
+  document.getElementById("manualMode").setAttribute("aria-pressed", String(manual));
+  resetEditor();
+  dayFoodForm.hidden = !manual;
+  setFoodStatus("");
+  (manual ? fields.name : document.getElementById("foodQuery")).focus();
+}
+document.getElementById("lookupMode").addEventListener("click", () => chooseMode(false));
+document.getElementById("manualMode").addEventListener("click", () => chooseMode(true));
+document.getElementById("cancelDayFood").addEventListener("click", () => {
+  if (savingFood) return;
+  resetEditor();
+  dayFoodForm.hidden = true;
+  setFoodStatus("");
+});
+function numericField(field, optional=false) {
+  if (optional && field.value.trim() === "") return null;
+  const value = Number(field.value);
+  return field.value.trim() !== "" && Number.isFinite(value) && value >= 0 ? value : NaN;
+}
+function readFoodValues() {
+  const values = {
+    name:fields.name.value.trim(),
+    serving_label:fields.serving_label.value.trim(),
+    servings:numericField(fields.servings),
+    source_url:selectedSource
+  };
+  nutrientKeys.forEach(key => values[key] = numericField(fields[key], key === "fiber"));
+  return values;
+}
+function hasValidMacros(values) {
+  return Number.isFinite(values.servings) && values.servings > 0 &&
+    nutrientKeys.every(key => (key === "fiber" && values[key] === null) ||
+      (Number.isFinite(values[key]) && Number.isFinite(values[key] * values.servings)));
+}
+function macroSummary(food) {
+  const servings = n(food.servings);
+  const pieces = [
+    rounded(n(food.calories)*servings)+" kcal",
+    rounded(n(food.protein)*servings)+" g protein",
+    rounded(n(food.carbs)*servings)+" g carbs",
+    rounded(n(food.fat)*servings)+" g fat",
+    food.fiber == null ? "fiber unknown" : rounded(n(food.fiber)*servings)+" g fiber"
+  ];
+  return pieces.join(" · ");
+}
+function renderFoodPreview() {
+  const values = readFoodValues();
+  document.getElementById("foodPreview").textContent = hasValidMacros(values)
+    ? "This entry adds: "+macroSummary(values)
+    : "Fill in the macros to preview this entry.";
+}
+dayFoodForm.addEventListener("input", renderFoodPreview);
+function selectProduct(product, suggestedServings) {
+  if (savingFood) return;
+  resetEditor();
+  fields.name.value = [product.name, product.brand].filter(Boolean).join(" — ").slice(0, 160);
+  fields.serving_label.value = product.basis === "100g" ? "100 g" : (product.serving_label || "1 serving");
+  fields.servings.value = product.basis === "serving" && Number.isFinite(Number(suggestedServings)) &&
+    Number(suggestedServings) > 0 ? Number(suggestedServings) : 1;
+  nutrientKeys.forEach(key => fields[key].value = product[key] == null ? "" : product[key]);
+  selectedSource = trustedSource(product.source_url);
+  const source = document.getElementById("foodSource");
+  addSourceLink(source, selectedSource);
+  source.hidden = !selectedSource;
+  const warning = document.getElementById("basisWarning");
+  warning.hidden = product.basis !== "100g";
+  warning.textContent = "These values are per 100 g. Adjust servings to the weight you ate: 30 g = 0.3 servings. Check your portion before saving.";
+  dayFoodForm.hidden = false;
+  setFoodStatus("");
+  renderFoodPreview();
+  fields.servings.focus();
+}
+function renderLookupResults(products, suggestedServings) {
+  lookupResults.replaceChildren();
+  for (const product of products) {
+    const card = document.createElement("div");
+    card.className = "food-result";
+    const heading = document.createElement("strong");
+    heading.textContent = product.name || "Unnamed food";
+    const details = document.createElement("p");
+    details.className = "small";
+    details.textContent = [product.brand, product.basis === "100g" ? "Per 100 g — portion adjustment required" :
+      "Per "+(product.serving_label || "serving")].filter(Boolean).join(" · ");
+    const macros = document.createElement("p");
+    macros.className = "small";
+    macros.textContent = macroSummary({...product, servings:1});
+    const pick = document.createElement("button");
+    pick.className = "btn";
+    pick.type = "button";
+    pick.textContent = "Use this food";
+    pick.addEventListener("click", () => selectProduct(product, suggestedServings));
+    const source = document.createElement("p");
+    source.className = "small";
+    addSourceLink(source, product.source_url);
+    card.append(heading, details, macros, pick, source);
+    lookupResults.appendChild(card);
+  }
+}
+async function requestJson(url, options={}) {
+  const response = await fetch(url, options);
+  let data;
+  try {
+    data = await response.json();
+  } catch (error) {
+    throw new Error("The server could not complete this request. Try again.");
+  }
+  if (!response.ok || !data.ok) {
+    throw new Error(typeof data.error === "string" ? data.error : "This request failed. Try again.");
+  }
+  return data;
+}
+lookupForm.addEventListener("submit", async event => {
+  event.preventDefault();
+  const query = document.getElementById("foodQuery").value.trim();
+  if (!query || lookupButton.disabled) return;
+  const generation = ++lookupGeneration;
+  lookupButton.disabled = true;
+  lookupButton.textContent = "Looking up…";
+  lookupResults.replaceChildren();
+  lookupStatus.classList.remove("food-error");
+  lookupStatus.textContent = "Looking up matching foods…";
+  try {
+    const data = await requestJson("/api/food-lookup?q="+encodeURIComponent(query));
+    if (generation !== lookupGeneration) return;
+    const products = Array.isArray(data.products) ? data.products : [];
+    renderLookupResults(products, data.suggested_servings);
+    lookupStatus.textContent = products.length
+      ? "Choose the product that matches what you ate. You can edit its macros before saving."
+      : "No matching foods found. Try the brand and product name, or choose Enter macros.";
+  } catch (error) {
+    if (generation !== lookupGeneration) return;
+    lookupStatus.classList.add("food-error");
+    lookupStatus.textContent = (error instanceof TypeError ? "Food lookup is unavailable. Check your connection." : error.message)
+      +" Try again or choose Enter macros.";
+  } finally {
+    if (generation === lookupGeneration) {
+      lookupButton.disabled = false;
+      lookupButton.textContent = "Look up food";
+    }
+  }
+});
+function updateDayFoods(data) {
+  dayFoodTotals = computeDayFoodTotals();
+  renderDayFoods();
+  renderTotals();
+}
+function renderDayFoods() {
+  const list = document.getElementById("dayFoodList");
+  list.replaceChildren();
+  document.getElementById("dayFoodEmpty").hidden = dayFoods.length > 0;
+  for (const food of dayFoods) {
+    const item = document.createElement("li");
+    item.className = "day-food-item";
+    const content = document.createElement("div");
+    const name = document.createElement("strong");
+    name.textContent = food.name;
+    const serving = document.createElement("p");
+    serving.className = "small";
+    serving.textContent = rounded(n(food.servings), 3)+" × "+(food.serving_label || "1 serving");
+    const macros = document.createElement("p");
+    macros.className = "small";
+    macros.textContent = macroSummary(food);
+    const source = document.createElement("p");
+    source.className = "small";
+    addSourceLink(source, food.source_url);
+    content.append(name, serving, macros, source);
+    const remove = document.createElement("button");
+    remove.className = "btn danger";
+    remove.type = "button";
+    remove.textContent = removingFoods.has(food.id) ? "Removing…" : "Remove";
+    remove.disabled = removingFoods.has(food.id);
+    remove.setAttribute("aria-label", "Remove "+food.name+" from "+DAY);
+    remove.addEventListener("click", () => removeDayFood(food.id));
+    item.append(content, remove);
+    list.appendChild(item);
+  }
+}
+async function removeDayFood(id) {
+  if (removingFoods.has(id)) return;
+  removingFoods.add(id);
+  renderDayFoods();
+  setFoodStatus("");
+  try {
+    const data = await requestJson("/api/day-food/"+encodeURIComponent(id), {
+      method:"DELETE",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({day:DAY})
+    });
+    dayFoods = dayFoods.filter(food => food.id !== id);
+    updateDayFoods(data);
+    setFoodStatus("Food removed from "+DAY+".");
+  } catch (error) {
+    setFoodStatus(error instanceof TypeError ? "Could not remove this food. Check your connection and try again." : error.message, true);
+  } finally {
+    removingFoods.delete(id);
+    renderDayFoods();
+  }
+}
+dayFoodForm.addEventListener("submit", async event => {
+  event.preventDefault();
+  if (savingFood || !dayFoodForm.reportValidity()) return;
+  const values = readFoodValues();
+  if (!values.name || !values.serving_label || !hasValidMacros(values)) {
+    setFoodStatus("Enter a food name, serving size, and valid nonnegative macros. Servings eaten must be greater than zero.", true);
+    return;
+  }
+  savingFood = true;
+  Object.values(fields).forEach(field => field.readOnly = true);
+  saveDayFood.disabled = true;
+  document.getElementById("cancelDayFood").disabled = true;
+  document.getElementById("lookupMode").disabled = true;
+  document.getElementById("manualMode").disabled = true;
+  saveDayFood.textContent = "Saving…";
+  setFoodStatus("");
+  try {
+    const data = await requestJson("/api/day-food", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({day:DAY, ...values})
+    });
+    dayFoods.push(data.entry);
+    updateDayFoods(data);
+    resetEditor();
+    dayFoodForm.hidden = document.getElementById("manualMode").getAttribute("aria-pressed") !== "true";
+    setFoodStatus(values.name+" saved to "+DAY+".");
+  } catch (error) {
+    setFoodStatus(error instanceof TypeError ? "Could not save this food. Check your connection and try again." : error.message, true);
+  } finally {
+    savingFood = false;
+    Object.values(fields).forEach(field => field.readOnly = false);
+    saveDayFood.disabled = false;
+    document.getElementById("cancelDayFood").disabled = false;
+    document.getElementById("lookupMode").disabled = false;
+    document.getElementById("manualMode").disabled = false;
+    saveDayFood.textContent = "Save to "+DAY;
+  }
+});
+renderDayFoods();
 renderTotals();
 </script>
 {% endblock %}
