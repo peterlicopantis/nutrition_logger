@@ -73,7 +73,14 @@
     <div class="day-food-grid">
       <label class="food-name-field"><span>Food name</span><input id="dfName" name="name" maxlength="160" required></label>
       <label><span>One serving is</span><input id="dfServingLabel" name="serving_label" value="1 serving" maxlength="120" required></label>
-      <label><span>Servings eaten</span><input id="dfServings" name="servings" type="number" inputmode="decimal" min="0.001" step="any" value="1" required></label>
+      <div class="amount-control serving-control" data-max="10" data-step="0.05" data-unit="servings">
+        <div class="amount-heading">
+          <label for="dfServingSlider">Servings eaten</label>
+          <input id="dfServings" class="amount-value" name="servings" type="text" inputmode="decimal" value="1" aria-label="Exact servings eaten" required>
+        </div>
+        <input id="dfServingSlider" class="amount-range" type="range" min="0" max="10" step="any" value="1" aria-label="Servings eaten">
+        <div class="range-footer"><span>0</span><span class="range-limit">10 servings</span></div>
+      </div>
       <label><span>Calories (kcal)</span><input id="dfCalories" name="calories" type="number" inputmode="decimal" min="0" step="any" required></label>
       <label><span>Protein (g)</span><input id="dfProtein" name="protein" type="number" inputmode="decimal" min="0" step="any" required></label>
       <label><span>Carbs (g)</span><input id="dfCarbs" name="carbs" type="number" inputmode="decimal" min="0" step="any" required></label>
@@ -96,29 +103,48 @@
 
 <div class="sections">
 {% for category, items in grouped.items() %}
+  {% set section_index = loop.index %}
   <section class="section">
     <h2>{{ category }}</h2>
     {% for food in items %}
       {% set unit = "kcal" if food.name.startswith("Cal") else "g" %}
-      <div class="foodrow">
-        <div class="fname">{{ food.name }}</div>
-        <div class="amountwrap">
-          <input
-            class="food-input"
-            type="number"
-            min="0"
-            step="1"
-            inputmode="decimal"
-            value="{{ food.amount|round(2) if food.amount else '' }}"
-            aria-label="{{ food.name|e }} ({{ unit }})"
-            data-name="{{ food.name|e }}"
-            data-cal="{{ food.cal_per_g }}"
-            data-protein="{{ food.protein_per_g }}"
-            data-carbs="{{ food.carbs_per_g }}"
-            data-fat="{{ food.fat_per_g }}"
-            data-fiber="{{ food.fiber_per_g }}"
-          >
-          <span class="unit">{{ unit }}</span>
+      {% set control_id = "amount-" ~ section_index ~ "-" ~ loop.index %}
+      {% set default_max = 2000 if unit == "kcal" else 1000 %}
+      <div class="foodrow amount-control" data-max="{{ default_max }}" data-step="10" data-unit="{{ unit }}">
+        <div class="amount-heading">
+          <label class="fname" for="{{ control_id }}-slider">{{ food.name }}</label>
+          <div class="amount-exact">
+            <input
+              id="{{ control_id }}"
+              class="food-input amount-value"
+              type="text"
+              inputmode="decimal"
+              value="{{ food.amount if food.amount else 0 }}"
+              aria-label="{{ food.name|e }} exact amount in {{ unit }}"
+              data-amount="{{ food.amount if food.amount else 0 }}"
+              data-name="{{ food.name|e }}"
+              data-cal="{{ food.cal_per_g }}"
+              data-protein="{{ food.protein_per_g }}"
+              data-carbs="{{ food.carbs_per_g }}"
+              data-fat="{{ food.fat_per_g }}"
+              data-fiber="{{ food.fiber_per_g }}"
+            >
+            <span class="amount-unit">{{ unit }}</span>
+          </div>
+        </div>
+        <input
+          id="{{ control_id }}-slider"
+          class="amount-range"
+          type="range"
+          min="0"
+          max="{{ [default_max, food.amount or 0]|max }}"
+          step="any"
+          value="{{ food.amount if food.amount else 0 }}"
+          aria-label="{{ food.name|e }} amount in {{ unit }}"
+        >
+        <div class="range-footer">
+          <span>0</span>
+          <span class="range-limit">{{ default_max }} {{ unit }}</span>
         </div>
       </div>
     {% endfor %}
@@ -157,7 +183,7 @@ function computeTotals() {
   const t = {calories:0, protein:0, carbs:0, fat:0, fiber:0, calc_calories:0};
   Object.keys(t).forEach(key => t[key] = n(dayFoodTotals[key]));
   for (const el of inputs) {
-    const a = n(el.value);
+    const a = n(el.dataset.amount);
     const p = n(el.dataset.protein), c = n(el.dataset.carbs), f = n(el.dataset.fat);
     t.calories += a*n(el.dataset.cal);
     t.protein += a*p;
@@ -181,23 +207,130 @@ function renderTotals() {
   if (energyBalance && HEALTH_BURN !== null) energyBalance.textContent = rounded(t.calories - HEALTH_BURN);
   document.getElementById("fiberNotice").hidden = !dayFoods.some(food => food.fiber == null);
 }
-async function saveInput(el) {
-  statusEl.textContent = "Saving…";
-  try {
-    const res = await fetch("/api/entry", {
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({day:DAY, food_name:el.dataset.name, amount:n(el.value)})
-    });
-    statusEl.textContent = res.ok ? "Saved" : "Save failed — edit the amount to retry";
-  } catch (error) {
-    statusEl.textContent = "Save failed — check your connection and edit the amount to retry";
-  }
+const amountControls = new Map();
+function parseAmount(value, allowEmpty=false) {
+  const text = String(value).trim().replace(",", ".");
+  if (!text) return allowEmpty ? 0 : null;
+  const amount = Number(text);
+  return Number.isFinite(amount) && amount >= 0 ? amount : null;
 }
-inputs.forEach(el => {
-  el.addEventListener("input", renderTotals);
-  el.addEventListener("change", () => saveInput(el));
-});
+function attachAmountSlider(control) {
+  const exact = control.querySelector(".amount-value");
+  const slider = control.querySelector(".amount-range");
+  const limit = control.querySelector(".range-limit");
+  const unit = control.dataset.unit;
+  const baseMax = Number(control.dataset.max);
+  const increment = Number(control.dataset.step);
+  let committed = parseAmount(exact.value, true) ?? 0;
+  exact.dataset.amount = String(committed);
+  function sync(acceptValue=false) {
+    const value = parseAmount(exact.value, true);
+    if (value !== null) exact.dataset.amount = String(value);
+    const amount = n(exact.dataset.amount);
+    if (acceptValue) {
+      committed = amount;
+      exact.setCustomValidity("");
+    }
+    slider.max = String(Math.max(Number(slider.max), Math.ceil(amount / baseMax) * baseMax));
+    slider.value = String(amount);
+    slider.setAttribute("aria-valuetext", amount+" "+unit);
+    slider.style.setProperty("--fill", (100 * amount / Number(slider.max))+"%");
+    limit.textContent = slider.max+" "+unit;
+  }
+  function notify() {
+    if (exact.classList.contains("food-input")) renderTotals();
+    else renderFoodPreview();
+  }
+  function commit() {
+    if (exact.readOnly || slider.disabled) return;
+    const amount = parseAmount(exact.value, true);
+    if (amount === null) {
+      exact.setCustomValidity("Enter a number that is zero or greater.");
+      exact.reportValidity();
+      return;
+    }
+    exact.setCustomValidity("");
+    exact.value = String(amount);
+    committed = amount;
+    sync();
+    notify();
+    if (exact.classList.contains("food-input")) saveInput(exact);
+  }
+  exact.addEventListener("input", () => {
+    exact.setCustomValidity("");
+    if (parseAmount(exact.value) !== null) {
+      sync();
+      notify();
+    }
+  });
+  exact.addEventListener("change", commit);
+  exact.addEventListener("keydown", event => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      exact.blur();
+    } else if (event.key === "Escape") {
+      exact.value = String(committed);
+      exact.setCustomValidity("");
+      sync();
+      notify();
+      exact.blur();
+    }
+  });
+  slider.addEventListener("input", () => {
+    if (exact.readOnly || slider.disabled) return;
+    const value = rounded(Math.round(Number(slider.value) / increment) * increment, 3);
+    exact.value = String(value);
+    exact.setCustomValidity("");
+    sync();
+    notify();
+  });
+  slider.addEventListener("change", commit);
+  slider.addEventListener("keydown", event => {
+    const direction = {ArrowLeft:-1, ArrowDown:-1, ArrowRight:1, ArrowUp:1}[event.key];
+    if (!direction || slider.disabled) return;
+    event.preventDefault();
+    slider.value = String(Math.max(0, Math.min(Number(slider.max),
+      n(exact.dataset.amount) + direction * increment * (event.shiftKey ? 10 : 1))));
+    slider.dispatchEvent(new Event("input", {bubbles:true}));
+    slider.dispatchEvent(new Event("change", {bubbles:true}));
+  });
+  sync();
+  amountControls.set(exact, {sync, slider});
+}
+const saveChains = new WeakMap();
+const saveErrors = new Set();
+let pendingSaves = 0;
+function showSaveStatus() {
+  statusEl.textContent = pendingSaves ? "Saving..." :
+    saveErrors.size ? "Save failed - adjust the amount to retry" : "Saved";
+}
+function saveInput(el) {
+  const amount = n(el.dataset.amount);
+  pendingSaves++;
+  showSaveStatus();
+  // Serialize releases for the same food so an older request cannot win.
+  const previous = saveChains.get(el) || Promise.resolve();
+  const job = previous.catch(() => {}).then(async () => {
+    try {
+      const res = await fetch("/api/entry", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({day:DAY, food_name:el.dataset.name, amount})
+      });
+      if (!res.ok) throw new Error("Save failed");
+      saveErrors.delete(el);
+    } catch (error) {
+      saveErrors.add(el);
+    } finally {
+      pendingSaves--;
+      showSaveStatus();
+    }
+  });
+  saveChains.set(el, job);
+  return job;
+}
+document.querySelectorAll(".amount-control").forEach(attachAmountSlider);
+
 document.getElementById("dayPicker").addEventListener("change", (e) => {
   if (e.target.value) window.location.href = "/?day="+encodeURIComponent(e.target.value);
 });
@@ -265,6 +398,7 @@ function setFoodStatus(message, isError=false) {
 }
 function resetEditor() {
   dayFoodForm.reset();
+  amountControls.get(fields.servings).sync(true);
   selectedSource = null;
   document.getElementById("basisWarning").hidden = true;
   document.getElementById("foodSource").replaceChildren();
@@ -303,7 +437,7 @@ function readFoodValues() {
   const values = {
     name:fields.name.value.trim(),
     serving_label:fields.serving_label.value.trim(),
-    servings:numericField(fields.servings),
+    servings:parseAmount(fields.servings.value) ?? NaN,
     source_url:selectedSource
   };
   nutrientKeys.forEach(key => values[key] = numericField(fields[key], key === "fiber"));
@@ -349,8 +483,9 @@ function selectProduct(product, suggestedServings) {
   warning.textContent = "These values are per 100 g. Adjust servings to the weight you ate: 30 g = 0.3 servings. Check your portion before saving.";
   dayFoodForm.hidden = false;
   setFoodStatus("");
+  amountControls.get(fields.servings).sync(true);
   renderFoodPreview();
-  fields.servings.focus();
+  amountControls.get(fields.servings).slider.focus();
 }
 function renderLookupResults(products, suggestedServings) {
   lookupResults.replaceChildren();
@@ -488,6 +623,7 @@ dayFoodForm.addEventListener("submit", async event => {
   }
   savingFood = true;
   Object.values(fields).forEach(field => field.readOnly = true);
+  amountControls.get(fields.servings).slider.disabled = true;
   saveDayFood.disabled = true;
   document.getElementById("cancelDayFood").disabled = true;
   document.getElementById("lookupMode").disabled = true;
@@ -510,6 +646,7 @@ dayFoodForm.addEventListener("submit", async event => {
   } finally {
     savingFood = false;
     Object.values(fields).forEach(field => field.readOnly = false);
+    amountControls.get(fields.servings).slider.disabled = false;
     saveDayFood.disabled = false;
     document.getElementById("cancelDayFood").disabled = false;
     document.getElementById("lookupMode").disabled = false;
