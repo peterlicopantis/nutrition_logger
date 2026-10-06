@@ -11,7 +11,7 @@ from collections.abc import Iterator
 from datetime import date, datetime
 from pathlib import Path
 
-from flask import Flask, jsonify, redirect, render_template, request, url_for
+from flask import Flask, jsonify, redirect, render_template, request, send_from_directory, url_for
 
 from food_lookup import FoodLookupError, lookup_foods
 
@@ -541,6 +541,11 @@ def settings_page():
         import_url=import_url,
         message=message,
     )
+
+
+@app.get("/favicon.ico")
+def favicon():
+    return send_from_directory(app.static_folder, "favicon.ico", mimetype="image/x-icon")
 
 
 @app.get("/manifest.json")
