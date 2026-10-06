@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}MELB Nutrition{% endblock %}
+{% block body_class %}dashboard-page{% endblock %}
 {% block content %}
 <div class="datebar">
   <label style="flex:1;max-width:220px">
@@ -9,6 +10,7 @@
   <span id="saveStatus" class="status" role="status">Saved</span>
 </div>
 
+<div class="mobile-summary" id="mobileSummary">
 <div class="metrics">
   <div class="metric"><div class="v" id="mCalories">{{ "%.0f"|format(totals.calories) }}</div><div class="k">Calories</div></div>
   <div class="metric"><div class="v" id="mProtein">{{ "%.1f"|format(totals.protein) }}g</div><div class="k">Protein</div></div>
@@ -17,25 +19,31 @@
   <div class="metric"><div class="v" id="mFiber">{{ "%.1f"|format(totals.fiber) }}g</div><div class="k">Fiber</div></div>
   <div class="metric"><div class="v" id="mCalc">{{ "%.0f"|format(totals.calc_calories) }}</div><div class="k">Calc calories</div></div>
 </div>
+<nav class="mobile-food-tabs" id="mobileFoodTabs" aria-label="Food categories">
+  {% for category, items in grouped.items() %}
+    <button class="mobile-group-tab" type="button" data-category="{{ category|e }}" aria-controls="food-group-{{ loop.index }}" aria-pressed="{{ 'true' if loop.first else 'false' }}">{{ category }}</button>
+  {% endfor %}
+</nav>
+</div>
 <p id="fiberNotice" class="small" hidden>Some added foods have no fiber value. The fiber total includes known values only.</p>
 
-<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+<div class="dashboard-actions">
   <button class="btn primary" id="healthButton" type="button">Send totals to Apple Health</button>
   <form method="post" action="/reset" onsubmit="return confirm('Clear every entry for this date?')">
     <input type="hidden" name="day" value="{{ day }}">
     <button class="btn danger" type="submit">Reset day</button>
   </form>
 </div>
-<div class="small" style="margin-bottom:14px">
+<div class="small health-export-note">
   Apple Health logging is intended for one final export of the day. Re-running the Shortcut can create duplicate Health samples.
 </div>
 
 {% if health_snapshot %}
-<div class="panel">
-  <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap">
+<details class="panel health-panel" id="healthPanel" open>
+  <summary class="snapshot-heading">
     <strong>Latest Apple Health snapshot</strong>
     <span class="small">{{ health_snapshot.captured_at }}</span>
-  </div>
+  </summary>
   <div class="healthgrid" style="margin-top:10px">
     <div class="metric"><div class="v">{{ health_snapshot.active_calories if health_snapshot.active_calories is not none else "—" }}</div><div class="k">Active kcal</div></div>
     <div class="metric"><div class="v">{{ health_snapshot.resting_calories if health_snapshot.resting_calories is not none else "—" }}</div><div class="k">Resting kcal</div></div>
@@ -43,11 +51,11 @@
     <div class="metric"><div class="v">{{ health_snapshot.weight if health_snapshot.weight is not none else "—" }}</div><div class="k">Weight</div></div>
     <div class="metric"><div class="v" id="healthEnergyBalance">{{ energy_balance if energy_balance is not none else "—" }}</div><div class="k">Food − burn</div></div>
   </div>
-</div>
+</details>
 {% endif %}
 
-<section class="panel" aria-labelledby="dayFoodHeading">
-  <h2 id="dayFoodHeading" class="panel-title">Add food for this day</h2>
+<details class="panel day-food-panel" id="dayFoodPanel" open aria-labelledby="dayFoodHeading">
+  <summary id="dayFoodHeading" class="panel-title">Add food for this day<span id="dayFoodCount" class="desktop-only small">{{ day_foods|length }} added</span></summary>
   <p class="small">Look up a packaged food or enter macros you know. Entries are saved only to {{ day }}.</p>
   <div class="food-tabs" aria-label="Food entry method">
     <button id="lookupMode" class="btn" type="button" aria-pressed="true">Food lookup</button>
@@ -99,12 +107,12 @@
   <h3 class="food-editor-heading">Added for {{ day }}</h3>
   <p id="dayFoodEmpty" class="small">No extra foods added for this date yet.</p>
   <ul id="dayFoodList" class="day-food-list" aria-label="Foods added for this date"></ul>
-</section>
+</details>
 
-<div class="sections">
+<div class="sections" id="foodSections">
 {% for category, items in grouped.items() %}
   {% set section_index = loop.index %}
-  <section class="section">
+  <section class="section{% if not loop.first %} mobile-category-inactive{% endif %}" id="food-group-{{ section_index }}" data-category="{{ category|e }}">
     <h2>{{ category }}</h2>
     {% for food in items %}
       {% set unit = "kcal" if food.name.startswith("Cal") else "g" %}
@@ -112,7 +120,7 @@
       {% set default_max = 2000 if unit == "kcal" else 1000 %}
       <div class="foodrow amount-control" data-max="{{ default_max }}" data-step="10" data-unit="{{ unit }}">
         <div class="amount-heading">
-          <label class="fname" for="{{ control_id }}-slider">{{ food.name }}</label>
+          <label class="fname" for="{{ control_id }}-slider" title="{{ food.name|e }}">{{ food.name }}</label>
           <div class="amount-exact">
             <input
               id="{{ control_id }}"
@@ -154,6 +162,57 @@
 
 <script>
 const DAY = {{ day|tojson }};
+const desktopLayout = window.matchMedia("(min-width:1024px)");
+const phoneLayout = window.matchMedia("(max-width:600px), (max-width:900px) and (pointer:coarse)");
+const compactPanels = [document.getElementById("dayFoodPanel"), document.getElementById("healthPanel")].filter(Boolean);
+function setPanelLayout() {
+  compactPanels.forEach(panel => {
+    if (!panel.contains(document.activeElement)) panel.open = !(desktopLayout.matches || phoneLayout.matches);
+  });
+}
+const foodSections = [...document.querySelectorAll("#foodSections > .section")];
+const groupButtons = [...document.querySelectorAll(".mobile-group-tab")];
+const mobileSummary = document.getElementById("mobileSummary");
+let selectedCategory = foodSections[0]?.dataset.category;
+function syncMobileCategories(preserveFocus=false) {
+  const focused = document.activeElement?.closest(".section");
+  if (preserveFocus && phoneLayout.matches && foodSections.includes(focused)) selectedCategory = focused.dataset.category;
+  foodSections.forEach(section => section.classList.toggle("mobile-category-inactive", section.dataset.category !== selectedCategory));
+  groupButtons.forEach(button => button.setAttribute("aria-pressed", String(button.dataset.category === selectedCategory)));
+}
+function measureMobileSummary() {
+  document.body.style.setProperty("--mobile-summary-height", Math.ceil(mobileSummary.getBoundingClientRect().height)+"px");
+}
+function updatePhoneTyping() {
+  document.body.classList.toggle("mobile-typing", phoneLayout.matches &&
+    Boolean(document.activeElement?.matches("input:not([type=range]), textarea")));
+}
+groupButtons.forEach(button => button.addEventListener("click", () => {
+  if (phoneLayout.matches && document.activeElement?.matches("input, textarea")) document.activeElement.blur();
+  selectedCategory = button.dataset.category;
+  syncMobileCategories();
+  if (phoneLayout.matches) document.getElementById("foodSections").scrollIntoView({block:"start"});
+}));
+setPanelLayout();
+syncMobileCategories();
+measureMobileSummary();
+desktopLayout.addEventListener("change", setPanelLayout);
+phoneLayout.addEventListener("change", () => {
+  setPanelLayout();
+  syncMobileCategories(true);
+  updatePhoneTyping();
+  requestAnimationFrame(measureMobileSummary);
+});
+if (typeof ResizeObserver === "function") new ResizeObserver(measureMobileSummary).observe(mobileSummary);
+document.addEventListener("focusin", () => {
+  const focused = document.activeElement?.closest(".section");
+  if (foodSections.includes(focused)) {
+    selectedCategory = focused.dataset.category;
+    syncMobileCategories();
+  }
+  updatePhoneTyping();
+});
+document.addEventListener("focusout", () => setTimeout(updatePhoneTyping, 0));
 const SHORTCUT = {{ shortcut_name|tojson }};
 const HEALTH_BURN = {{ ((health_snapshot.active_calories + health_snapshot.resting_calories) if health_snapshot and health_snapshot.active_calories is not none and health_snapshot.resting_calories is not none else none)|tojson }};
 const inputs = [...document.querySelectorAll(".food-input")];
@@ -562,6 +621,7 @@ function updateDayFoods(data) {
   renderTotals();
 }
 function renderDayFoods() {
+  document.getElementById("dayFoodCount").textContent = dayFoods.length+" added";
   const list = document.getElementById("dayFoodList");
   list.replaceChildren();
   document.getElementById("dayFoodEmpty").hidden = dayFoods.length > 0;
