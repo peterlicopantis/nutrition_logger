@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Settings · MELB{% endblock %}
+{% block content %}
+<h1 style="font-size:1.35rem">Settings</h1>
+{% if message %}<div class="notice">{{ message }}</div>{% endif %}
+<form method="post" class="panel">
+  <label><span>Apple Shortcut name</span>
+    <input name="shortcut_name" value="{{ cfg.shortcut_name }}" required>
+  </label>
+  <button class="btn primary" style="margin-top:12px" type="submit">Save</button>
+</form>
+
+<div class="panel">
+  <strong>Optional Apple Health → PC import</strong>
+  <p class="small">The app already has an endpoint ready for an iPhone Shortcut to send back daily Health totals.</p>
+  <p><span class="small">Endpoint</span><br><code>{{ import_url }}</code></p>
+  <p><span class="small">Header</span><br><code>X-MELB-Token: {{ cfg.health_import_token }}</code></p>
+  <p class="small">Use the instructions in <code>APPLE_HEALTH_SHORTCUTS.md</code> to wire this up.</p>
+</div>
+{% endblock %}

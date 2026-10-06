@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}MELB Nutrition{% endblock %}
+{% block content %}
+<div class="datebar">
+  <label style="flex:1;max-width:220px">
+    <span>Date</span>
+    <input id="dayPicker" type="date" value="{{ day }}">
+  </label>
+  <span id="saveStatus" class="status">Saved</span>
+</div>
+
+<div class="metrics">
+  <div class="metric"><div class="v" id="mCalories">{{ "%.0f"|format(totals.calories) }}</div><div class="k">Calories</div></div>
+  <div class="metric"><div class="v" id="mProtein">{{ "%.1f"|format(totals.protein) }}g</div><div class="k">Protein</div></div>
+  <div class="metric"><div class="v" id="mCarbs">{{ "%.1f"|format(totals.carbs) }}g</div><div class="k">Carbs</div></div>
+  <div class="metric"><div class="v" id="mFat">{{ "%.1f"|format(totals.fat) }}g</div><div class="k">Fat</div></div>
+  <div class="metric"><div class="v" id="mFiber">{{ "%.1f"|format(totals.fiber) }}g</div><div class="k">Fiber</div></div>
+  <div class="metric"><div class="v" id="mCalc">{{ "%.0f"|format(totals.calc_calories) }}</div><div class="k">Calc calories</div></div>
+</div>
+
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+  <button class="btn primary" id="healthButton" type="button">Send totals to Apple Health</button>
+  <form method="post" action="/reset" onsubmit="return confirm('Clear every entry for this date?')">
+    <input type="hidden" name="day" value="{{ day }}">
+    <button class="btn danger" type="submit">Reset day</button>
+  </form>
+</div>
+<div class="small" style="margin-bottom:14px">
+  Apple Health logging is intended for one final export of the day. Re-running the Shortcut can create duplicate Health samples.
+</div>
+
+{% if health_snapshot %}
+<div class="panel">
+  <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap">
+    <strong>Latest Apple Health snapshot</strong>
+    <span class="small">{{ health_snapshot.captured_at }}</span>
+  </div>
+  <div class="healthgrid" style="margin-top:10px">
+    <div class="metric"><div class="v">{{ health_snapshot.active_calories if health_snapshot.active_calories is not none else "—" }}</div><div class="k">Active kcal</div></div>
+    <div class="metric"><div class="v">{{ health_snapshot.resting_calories if health_snapshot.resting_calories is not none else "—" }}</div><div class="k">Resting kcal</div></div>
+    <div class="metric"><div class="v">{{ health_snapshot.steps|round|int if health_snapshot.steps is not none else "—" }}</div><div class="k">Steps</div></div>
+    <div class="metric"><div class="v">{{ health_snapshot.weight if health_snapshot.weight is not none else "—" }}</div><div class="k">Weight</div></div>
+    <div class="metric"><div class="v">{{ energy_balance if energy_balance is not none else "—" }}</div><div class="k">Food − burn</div></div>
+  </div>
+</div>
+{% endif %}
+
+<div class="sections">
+{% for category, items in grouped.items() %}
+  <section class="section">
+    <h2>{{ category }}</h2>
+    {% for food in items %}
+      {% set unit = "kcal" if food.name.startswith("Cal") else "g" %}
+      <div class="foodrow">
+        <div class="fname">{{ food.name }}</div>
+        <div class="amountwrap">
+          <input
+            class="food-input"
+            type="number"
+            min="0"
+            step="1"
+            inputmode="decimal"
+            value="{{ food.amount|round(2) if food.amount else '' }}"
+            data-name="{{ food.name|e }}"
+            data-cal="{{ food.cal_per_g }}"
+            data-protein="{{ food.protein_per_g }}"
+            data-carbs="{{ food.carbs_per_g }}"
+            data-fat="{{ food.fat_per_g }}"
+            data-fiber="{{ food.fiber_per_g }}"
+          >
+          <span class="unit">{{ unit }}</span>
+        </div>
+      </div>
+    {% endfor %}
+  </section>
+{% endfor %}
+</div>
+
+<script>
+const DAY = {{ day|tojson }};
+const SHORTCUT = {{ shortcut_name|tojson }};
+const inputs = [...document.querySelectorAll(".food-input")];
+const statusEl = document.getElementById("saveStatus");
+
+function n(v) {
+  const x = parseFloat(v);
+  return Number.isFinite(x) ? x : 0;
+}
+function rounded(x, d=2) {
+  const p = Math.pow(10,d);
+  return Math.round((x + Number.EPSILON) * p) / p;
+}
+function computeTotals() {
+  const t = {calories:0, protein:0, carbs:0, fat:0, fiber:0, calc_calories:0};
+  for (const el of inputs) {
+    const a = n(el.value);
+    const p = n(el.dataset.protein), c = n(el.dataset.carbs), f = n(el.dataset.fat);
+    t.calories += a*n(el.dataset.cal);
+    t.protein += a*p;
+    t.carbs += a*c;
+    t.fat += a*f;
+    t.fiber += a*n(el.dataset.fiber);
+    t.calc_calories += a*(p*4+c*4+f*9);
+  }
+  Object.keys(t).forEach(k => t[k] = rounded(t[k]));
+  return t;
+}
+function renderTotals() {
+  const t = computeTotals();
+  document.getElementById("mCalories").textContent = Math.round(t.calories);
+  document.getElementById("mProtein").textContent = t.protein.toFixed(1)+"g";
+  document.getElementById("mCarbs").textContent = t.carbs.toFixed(1)+"g";
+  document.getElementById("mFat").textContent = t.fat.toFixed(1)+"g";
+  document.getElementById("mFiber").textContent = t.fiber.toFixed(1)+"g";
+  document.getElementById("mCalc").textContent = Math.round(t.calc_calories);
+}
+async function saveInput(el) {
+  statusEl.textContent = "Saving…";
+  const res = await fetch("/api/entry", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({day:DAY, food_name:el.dataset.name, amount:n(el.value)})
+  });
+  statusEl.textContent = res.ok ? "Saved" : "Save failed";
+}
+inputs.forEach(el => {
+  el.addEventListener("input", renderTotals);
+  el.addEventListener("change", () => saveInput(el));
+});
+document.getElementById("dayPicker").addEventListener("change", (e) => {
+  window.location.href = "/?day="+encodeURIComponent(e.target.value);
+});
+document.getElementById("healthButton").addEventListener("click", () => {
+  const t = computeTotals();
+  const payload = {
+    source:"MELB Nutrition",
+    date:DAY,
+    calories:t.calories,
+    protein:t.protein,
+    carbs:t.carbs,
+    fat:t.fat,
+    fiber:t.fiber
+  };
+  const url = "shortcuts://run-shortcut?name=" + encodeURIComponent(SHORTCUT)
+            + "&input=text&text=" + encodeURIComponent(JSON.stringify(payload));
+  window.location.href = url;
+});
+renderTotals();
+</script>
+{% endblock %}
