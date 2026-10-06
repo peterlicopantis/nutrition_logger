@@ -127,3 +127,34 @@ Back up these files occasionally:
 - `config.json` (created on first run)
 
 `MELB_filtered.ipynb` is included as a cleaned notebook backup containing only the same 35 foods.
+
+## Foods for just one day
+
+On the dashboard, select a date and use **Add food for this day**:
+
+- **Food lookup** accepts a product name, a short description such as
+  "Oh I had a rice krispy treat", or a package barcode. Choose the matching
+  brand and size, review the nutrition, and adjust the servings before saving.
+- **Enter macros** lets you enter the calories, protein, carbs, fat, and
+  optional fiber you know. Enter values for one serving and the number of
+  servings eaten. Leave fiber blank when unknown.
+
+These foods are saved only to the selected date in melb.db; they do not become
+rows in the permanent foods list. You can add the same food more than once and
+remove individual entries. They count toward daily totals, energy balance, and
+the Apple Health export. **Reset day** clears both regular entries and these
+foods for that date.
+
+Lookup uses [Open Food Facts](https://world.openfoodfacts.org), with no API key
+or extra package required. This is product database search with support for
+simple descriptions, not a general AI nutrition estimator. Internet access is
+needed for lookup; manual entry works offline. The source link is shown with
+each match. Check the brand, flavor, size, and label: search results are
+community-supplied and cannot guarantee an exact match.
+
+When a product has no usable serving information, its results are explicitly
+shown **per 100 g**. Enter the portion in grams (for example, 25 g is 0.25 of
+a 100 g portion). The app never treats those values as one bar or one item.
+Missing core macros are excluded from search results; missing fiber stays
+unknown. Data is attributed to Open Food Facts under
+[ODbL](https://opendatacommons.org/licenses/odbl/1-0/).

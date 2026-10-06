@@ -10,9 +10,20 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
-call .venv\Scripts\activate.bat
-python -m pip install --upgrade pip
-pip install -r requirements.txt
+"%~dp0.venv\Scripts\python.exe" -m pip install --upgrade pip
+if errorlevel 1 (
+  echo.
+  echo Could not update pip. Check the error above and try again.
+  pause
+  exit /b 1
+)
+"%~dp0.venv\Scripts\python.exe" -m pip install -r "%~dp0requirements.txt"
+if errorlevel 1 (
+  echo.
+  echo Dependencies could not be installed. Check the error above and try again.
+  pause
+  exit /b 1
+)
 echo.
 echo Setup complete.
 echo Double-click RUN_MELB_APP.bat to start the app.
