@@ -13,12 +13,27 @@
   <link rel="manifest" href="{{ url_for('manifest') }}">
   <title>{% block title %}MELB Nutrition{% endblock %}</title>
   <style>
+    @font-face {
+      font-family:"Inter";
+      src:url("{{ url_for('static', filename='fonts/Inter-Variable.ttf') }}") format("truetype");
+      font-style:normal;
+      font-weight:100 900;
+      font-display:swap;
+    }
+    @font-face {
+      font-family:"Inter";
+      src:url("{{ url_for('static', filename='fonts/Inter-Italic-Variable.ttf') }}") format("truetype");
+      font-style:italic;
+      font-weight:100 900;
+      font-display:swap;
+    }
     :root {
       --bg:#0b1220; --card:#111827; --card2:#182235; --text:#f3f4f6; --muted:#9ca3af;
       --border:#2a364b; --accent:#60a5fa; --good:#34d399; --danger:#f87171;
     }
     * { box-sizing:border-box; }
-    body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:var(--bg); color:var(--text); }
+    body { margin:0; font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; font-optical-sizing:auto; background:var(--bg); color:var(--text); }
+    button, input, select, textarea, code, pre { font-family:inherit; }
     a { color:inherit; }
     .wrap { max-width:1300px; margin:auto; padding:16px; }
     .topbar { display:flex; gap:12px; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
