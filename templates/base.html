@@ -125,9 +125,199 @@
       .food-name-field, .serving-control { grid-column:auto; }
       .day-food-item { align-items:start; }
     }
+    .dashboard-actions { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
+    .health-export-note { margin-bottom:14px; }
+    .desktop-only { display:none; }
+    .day-food-panel > summary { display:block; list-style:none; cursor:pointer; font-weight:700; }
+    .day-food-panel > summary::-webkit-details-marker { display:none; }
+    .snapshot-heading { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; list-style:none; cursor:pointer; }
+    .snapshot-heading::-webkit-details-marker { display:none; }
+    @media (min-width:1024px) {
+      .dashboard-page .wrap { max-width:1600px; padding:10px 12px; }
+      .dashboard-page .topbar { margin-bottom:6px; gap:8px; }
+      .dashboard-page .brand { font-size:1.1rem; }
+      .dashboard-page .nav { gap:6px; }
+      .dashboard-page .btn { padding:5px 10px; border-radius:8px; font-size:12px; }
+      .dashboard-page .datebar { margin-bottom:6px; gap:8px; }
+      .dashboard-page .datebar label { display:flex; align-items:center; gap:8px; font-size:12px; }
+      .dashboard-page .datebar label span { margin:0; }
+      .dashboard-page #dayPicker { width:150px; padding:4px 7px; height:28px; font-size:12px; }
+      .dashboard-page .status { font-size:11px; }
+      .dashboard-page .metrics { gap:6px; margin:6px 0; }
+      .dashboard-page .metrics .metric { display:flex; align-items:baseline; justify-content:space-between; gap:8px; padding:6px 9px; border-radius:8px; }
+      .dashboard-page .metrics .v { font-size:18px; }
+      .dashboard-page .metrics .k { margin:0; font-size:11px; white-space:nowrap; }
+      .dashboard-page .dashboard-actions { gap:6px; margin-bottom:4px; }
+      .dashboard-page .health-export-note { margin-bottom:6px; font-size:10px; line-height:14px; }
+      .dashboard-page #fiberNotice { margin:4px 0; font-size:11px; }
+      .dashboard-page .day-food-panel, .dashboard-page .health-panel { margin:6px 0; padding:7px 10px; border-radius:8px; }
+      .dashboard-page .day-food-panel > summary, .dashboard-page .snapshot-heading { font-size:12px; line-height:18px; }
+      .dashboard-page .day-food-panel > summary::before, .dashboard-page .snapshot-heading::before { content:"\25B8"; color:var(--accent); margin-right:7px; }
+      .dashboard-page .day-food-panel[open] > summary::before, .dashboard-page .health-panel[open] > summary::before { content:"\25BE"; }
+      .dashboard-page .desktop-only { display:inline; }
+      .dashboard-page #dayFoodCount { margin-left:8px; font-weight:400; font-size:11px; }
+      .dashboard-page .snapshot-heading { justify-content:flex-start; flex-wrap:nowrap; gap:0; }
+      .dashboard-page .snapshot-heading > .small { margin-left:auto; font-size:10px; }
+      .dashboard-page .sections { grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin-top:8px; }
+      .dashboard-page .section { padding:6px 8px; border-radius:8px; min-width:0; }
+      .dashboard-page .section h2 { font-size:13px; line-height:18px; margin:0 0 4px; }
+      .dashboard-page .foodrow { display:grid; grid-template-columns:minmax(0,1fr) minmax(62px,1.15fr) 74px; grid-template-areas:"name slider amount"; align-items:center; gap:6px; height:26px; padding:0; border-top:0; }
+      .dashboard-page .foodrow .amount-heading { display:contents; }
+      .dashboard-page .foodrow .fname { grid-area:name; font-size:12px; line-height:18px; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .dashboard-page .foodrow .amount-exact { grid-area:amount; justify-content:flex-end; gap:3px; min-width:0; }
+      .dashboard-page .foodrow input.amount-value { width:50px; min-height:22px; height:22px; border-radius:5px; padding:2px 4px; font-size:12px; }
+      .dashboard-page .foodrow .amount-unit { font-size:10px; }
+      .dashboard-page .foodrow input.amount-range { grid-area:slider; height:24px; margin:0; border-radius:5px; }
+      .dashboard-page .foodrow input.amount-range::-webkit-slider-runnable-track { height:4px; }
+      .dashboard-page .foodrow input.amount-range::-webkit-slider-thumb { width:14px; height:14px; margin-top:-5px; border-width:2px; }
+      .dashboard-page .foodrow input.amount-range::-moz-range-track, .dashboard-page .foodrow input.amount-range::-moz-range-progress { height:4px; }
+      .dashboard-page .foodrow input.amount-range::-moz-range-thumb { width:10px; height:10px; border-width:2px; }
+      .dashboard-page .foodrow .range-footer { display:none; }
+      @media (max-height:800px) {
+        .dashboard-page .foodrow { height:24px; }
+      }
+    }
+    @media (min-width:1600px) and (min-height:900px) {
+      .dashboard-page {
+        --desktop-label-size:clamp(14px,.75vw,17px);
+        --desktop-exact-width:clamp(60px,3.1vw,80px);
+        --desktop-thumb-size:clamp(18px,1.6vh,22px);
+      }
+      .dashboard-page .wrap { max-width:2200px; padding:16px 20px; }
+      .dashboard-page .topbar { margin-bottom:10px; }
+      .dashboard-page .brand { font-size:clamp(20px,1vw,26px); }
+      .dashboard-page .nav { gap:8px; }
+      .dashboard-page .btn { padding:7px 12px; font-size:clamp(13px,.7vw,16px); border-radius:9px; }
+      .dashboard-page .datebar { margin-bottom:8px; gap:12px; }
+      .dashboard-page .datebar label { font-size:14px; gap:10px; }
+      .dashboard-page #dayPicker { width:180px; height:34px; padding:6px 10px; font-size:14px; }
+      .dashboard-page .status { font-size:13px; }
+      .dashboard-page .metrics { gap:10px; margin:8px 0; }
+      .dashboard-page .metrics .metric { padding:8px 12px; border-radius:10px; }
+      .dashboard-page .metrics .v { font-size:clamp(24px,1.1vw,28px); }
+      .dashboard-page .metrics .k { font-size:clamp(12px,.65vw,15px); }
+      .dashboard-page .dashboard-actions { gap:8px; margin-bottom:6px; }
+      .dashboard-page .health-export-note { font-size:12px; line-height:17px; margin-bottom:8px; }
+      .dashboard-page #fiberNotice { font-size:13px; }
+      .dashboard-page .day-food-panel, .dashboard-page .health-panel { margin:8px 0; padding:10px 14px; border-radius:10px; }
+      .dashboard-page .day-food-panel > summary, .dashboard-page .snapshot-heading { font-size:15px; line-height:21px; }
+      .dashboard-page #dayFoodCount { font-size:13px; margin-left:10px; }
+      .dashboard-page .snapshot-heading > .small { font-size:12px; }
+      .dashboard-page .sections { gap:12px; margin-top:12px; }
+      .dashboard-page .section { padding:10px 12px; border-radius:10px; }
+      .dashboard-page .section h2 { font-size:clamp(16px,.95vw,20px); line-height:24px; margin-bottom:6px; }
+      .dashboard-page .foodrow {
+        grid-template-columns:minmax(0,1fr) minmax(84px,1.15fr) calc(var(--desktop-exact-width) + 32px);
+        gap:10px; height:clamp(28px,3.2vh,42px);
+      }
+      .dashboard-page .foodrow .fname { font-size:var(--desktop-label-size); line-height:22px; }
+      .dashboard-page .foodrow .amount-exact { gap:4px; }
+      .dashboard-page .foodrow input.amount-value {
+        width:var(--desktop-exact-width); min-height:24px; height:clamp(24px,2.4vh,32px);
+        padding:3px 5px; font-size:var(--desktop-label-size); border-radius:6px;
+      }
+      .dashboard-page .foodrow .amount-unit { font-size:clamp(11px,.55vw,14px); }
+      .dashboard-page .foodrow input.amount-range { height:clamp(26px,2.8vh,36px); }
+      .dashboard-page .foodrow input.amount-range::-webkit-slider-runnable-track { height:6px; }
+      .dashboard-page .foodrow input.amount-range::-webkit-slider-thumb {
+        width:var(--desktop-thumb-size); height:var(--desktop-thumb-size);
+        margin-top:calc((6px - var(--desktop-thumb-size)) / 2);
+      }
+      .dashboard-page .foodrow input.amount-range::-moz-range-track,
+      .dashboard-page .foodrow input.amount-range::-moz-range-progress { height:6px; }
+      .dashboard-page .foodrow input.amount-range::-moz-range-thumb {
+        width:calc(var(--desktop-thumb-size) - 4px); height:calc(var(--desktop-thumb-size) - 4px);
+      }
+    }
+    @media (min-width:1600px) and (min-height:900px) and (max-height:999px) {
+      .dashboard-page .wrap { padding-top:10px; padding-bottom:10px; }
+      .dashboard-page .topbar { margin-bottom:8px; }
+      .dashboard-page .day-food-panel, .dashboard-page .health-panel { padding-top:8px; padding-bottom:8px; }
+      .dashboard-page .section { padding-top:8px; padding-bottom:8px; }
+      .dashboard-page .foodrow { height:clamp(26px,3vh,30px); }
+    }
+    .mobile-summary { display:contents; }
+    .mobile-food-tabs { display:none; }
+    @media (max-width:600px), (max-width:900px) and (pointer:coarse) {
+      .dashboard-page .wrap {
+        padding:calc(10px + env(safe-area-inset-top)) max(10px,env(safe-area-inset-right))
+          calc(12px + env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left));
+      }
+      .dashboard-page .topbar { gap:8px; margin-bottom:10px; }
+      .dashboard-page .brand { font-size:18px; }
+      .dashboard-page .nav { width:100%; gap:6px; }
+      .dashboard-page .nav .btn { flex:1; padding:10px 6px; min-height:44px; font-size:12px; text-align:center; }
+      .dashboard-page .datebar { gap:8px; margin-bottom:8px; }
+      .dashboard-page .datebar label { display:flex; align-items:center; gap:8px; font-size:13px; }
+      .dashboard-page .datebar label span { margin:0; }
+      .dashboard-page #dayPicker { width:160px; height:44px; padding:8px; }
+      .dashboard-page .status { font-size:11px; margin-left:0; }
+      .dashboard-page .mobile-summary {
+        display:block; position:sticky; top:env(safe-area-inset-top); z-index:20;
+        background:var(--bg); padding:6px 0 8px; margin-bottom:8px;
+        box-shadow:0 1px 0 var(--border);
+      }
+      .dashboard-page.mobile-typing .mobile-summary { position:static; }
+      .dashboard-page .mobile-summary .metrics { grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; margin:0; }
+      .dashboard-page .mobile-summary .metric { padding:6px 8px; border-radius:10px; }
+      .dashboard-page .mobile-summary .metric .v { font-size:19px; line-height:23px; }
+      .dashboard-page .mobile-summary .metric .k { font-size:10px; line-height:13px; margin-top:1px; }
+      .dashboard-page .mobile-food-tabs { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:4px; margin-top:6px; }
+      .dashboard-page .mobile-group-tab { padding:6px 3px; min-width:0; min-height:44px; font-size:12px; border-radius:9px; white-space:nowrap; }
+      .dashboard-page .mobile-group-tab[aria-pressed="true"] { background:var(--accent); color:#06111f; border-color:var(--accent); }
+      .dashboard-page .mobile-group-tab:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+      .dashboard-page .dashboard-actions { gap:6px; margin-bottom:6px; }
+      .dashboard-page .dashboard-actions .btn { min-height:44px; padding:10px; font-size:12px; }
+      .dashboard-page .health-export-note { font-size:11px; line-height:15px; margin-bottom:8px; }
+      .dashboard-page #fiberNotice { margin:6px 0; font-size:11px; }
+      .dashboard-page .day-food-panel, .dashboard-page .health-panel { margin:8px 0; padding:4px 10px; border-radius:12px; }
+      .dashboard-page .day-food-panel > summary, .dashboard-page .snapshot-heading {
+        display:flex; align-items:center; gap:6px; min-height:44px; font-size:14px; line-height:20px;
+      }
+      .dashboard-page .day-food-panel > summary::before, .dashboard-page .snapshot-heading::before { content:"\25B8"; color:var(--accent); flex-shrink:0; }
+      .dashboard-page .day-food-panel[open] > summary::before, .dashboard-page .health-panel[open] > summary::before { content:"\25BE"; }
+      .dashboard-page #dayFoodCount { display:inline; margin-left:auto; font-size:11px; white-space:nowrap; font-weight:400; }
+      .dashboard-page .snapshot-heading > .small { display:none; }
+      .dashboard-page .health-panel[open] .snapshot-heading > .small { display:block; width:100%; font-size:11px; }
+      .dashboard-page .sections {
+        grid-template-columns:1fr; gap:8px; margin-top:8px;
+        scroll-margin-top:calc(var(--mobile-summary-height,170px) + env(safe-area-inset-top) + 8px);
+      }
+      .dashboard-page .sections > .mobile-category-inactive { display:none; }
+      .dashboard-page .section { padding:8px 10px; border-radius:12px; min-width:0; }
+      .dashboard-page .section h2 { font-size:16px; line-height:22px; margin:2px 0 4px; }
+      .dashboard-page .foodrow {
+        display:grid; grid-template-columns:minmax(80px,1fr) minmax(80px,1.25fr) 82px;
+        grid-template-areas:"name slider amount"; gap:6px; align-items:center; min-height:50px; padding:3px 0;
+        scroll-margin-top:calc(var(--mobile-summary-height,170px) + env(safe-area-inset-top) + 8px);
+      }
+      .dashboard-page .foodrow .amount-heading { display:contents; }
+      .dashboard-page .foodrow .fname { grid-area:name; font-size:14px; line-height:17px; text-align:left; }
+      .dashboard-page .foodrow .amount-exact { grid-area:amount; justify-content:flex-end; gap:3px; min-width:0; }
+      .dashboard-page .foodrow input.amount-value { width:58px; min-height:44px; padding:5px; font-size:16px; border-radius:8px; }
+      .dashboard-page .foodrow .amount-unit { font-size:11px; }
+      .dashboard-page .foodrow input.amount-range { grid-area:slider; height:44px; margin:0; }
+      .dashboard-page .foodrow input.amount-range::-webkit-slider-runnable-track { height:6px; }
+      .dashboard-page .foodrow input.amount-range::-webkit-slider-thumb { width:26px; height:26px; margin-top:-10px; }
+      .dashboard-page .foodrow input.amount-range::-moz-range-track,
+      .dashboard-page .foodrow input.amount-range::-moz-range-progress { height:6px; }
+      .dashboard-page .foodrow input.amount-range::-moz-range-thumb { width:20px; height:20px; }
+      .dashboard-page .foodrow .range-footer { display:none; }
+      .dashboard-page .lookup-controls { align-items:stretch; flex-direction:column; }
+      .dashboard-page .food-results { grid-template-columns:1fr; }
+      .dashboard-page .day-food-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+      .dashboard-page .food-name-field, .dashboard-page .serving-control { grid-column:1 / -1; }
+      .dashboard-page .day-food-grid input { min-height:44px; }
+      .dashboard-page .day-food-item { gap:8px; }
+      .dashboard-page .day-food-item > button { min-height:44px; }
+    }
+    @media (min-width:601px) and (max-width:900px) and (max-height:500px) and (orientation:landscape) and (pointer:coarse) {
+      .dashboard-page .mobile-summary .metrics { grid-template-columns:repeat(6,minmax(0,1fr)); }
+      .dashboard-page .mobile-summary .metric .v { font-size:17px; }
+    }
   </style>
 </head>
-<body>
+<body class="{% block body_class %}{% endblock %}">
   <div class="wrap">
     <div class="topbar">
       <div class="brand">MELB Nutrition</div>
