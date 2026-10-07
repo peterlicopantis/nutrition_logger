@@ -31,6 +31,12 @@
 <p id="fiberNotice" class="small" hidden>Some added foods have no fiber value. The fiber total includes known values only.</p>
 
 <div class="dashboard-actions">
+  {% set salt_summary = salt_spins|default({"spins":0, "grams":0}, true) %}
+  <div class="salt-spin-summary" role="status" aria-live="polite" title="Meal grams plus checked logged foods, with an extra 1.5 times rice weight, divided by 29.">
+    <span>Salt shaker: ~<strong id="saltSpins">{{ salt_summary.spins }}</strong> spins</span>
+    <span class="small"><span id="saltMealGrams">{{ salt_summary.grams }}</span> g salt weight &middot; 1 spin / 29 g</span>
+    <span class="small">Rice: +<span id="saltRiceBonus">{{ salt_summary.rice_bonus|default(0) }}</span> g (extra 1.5&times;)</span>
+  </div>
   <button class="btn primary" id="healthButton" type="button">Send totals to Apple Health</button>
   <form method="post" action="/reset" onsubmit="return confirm('Clear every entry for this date?')">
     <input type="hidden" name="day" value="{{ day }}">
@@ -128,9 +134,10 @@
       {% set unit = "kcal" if food.name.startswith("Cal") else "g" %}
       {% set control_id = "amount-" ~ section_index ~ "-" ~ loop.index %}
       {% set default_max = 2000 if unit == "kcal" else 1000 %}
-      <div class="foodrow amount-control" data-max="{{ default_max }}" data-step="10" data-unit="{{ unit }}">
+      {% set rice_bonus = category == "Meal" and is_rice_for_spins(food.name) %}
+      <div class="foodrow amount-control{% if rice_bonus %} rice-salt-row{% endif %}" data-max="{{ default_max }}" data-step="10" data-unit="{{ unit }}">
         <div class="amount-heading">
-          <label class="fname" for="{{ control_id }}-slider" title="{{ food.name|e }}">{{ food.name }}</label>
+          <label class="fname" for="{{ control_id }}-slider" title="{{ food.name|e }}">{{ food.name }}{% if rice_bonus %}<span id="{{ control_id }}-salt-note" class="rice-salt-badge" title="For salt spins: entered grams + 1.5 times extra. 200 g rice counts as 500 g. Calories and macros use the entered grams.">2.5&times; salt weight</span>{% endif %}</label>
           <div class="amount-exact">
             <input
               id="{{ control_id }}"
@@ -139,6 +146,7 @@
               inputmode="decimal"
               value="{{ food.amount if food.amount else 0 }}"
               aria-label="{{ food.name|e }} exact amount in {{ unit }}"
+              {% if rice_bonus %}aria-describedby="{{ control_id }}-salt-note"{% endif %}
               data-amount="{{ food.amount if food.amount else 0 }}"
               data-name="{{ food.name|e }}"
               data-cal="{{ food.cal_per_g }}"
@@ -159,6 +167,7 @@
           step="any"
           value="{{ food.amount if food.amount else 0 }}"
           aria-label="{{ food.name|e }} amount in {{ unit }}"
+          {% if rice_bonus %}aria-describedby="{{ control_id }}-salt-note"{% endif %}
         >
         <div class="range-footer">
           <span>0</span>

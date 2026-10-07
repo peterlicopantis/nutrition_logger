@@ -197,3 +197,24 @@ information need a measured weight or manual label entry.
 Missing core macros are excluded from search results; missing fiber stays
 unknown. Data is attributed to Open Food Facts under
 [ODbL](https://opendatacommons.org/licenses/odbl/1-0/).
+
+
+## Salt shaker spins
+
+The dashboard estimates spins as Meal-category grams plus the mass of checked
+daily logged foods, divided by 29 (one decimal place). Other permanent categories
+do not contribute. Temporary foods start unchecked; use Include in spins after
+logging them. Their mass is grams per serving times servings eaten, counted once.
+
+Lookup entries preserve their selected portion weight. Existing entries use an
+unambiguous gram weight written in their serving label when available. Foods
+without a known gram mass have a Grams per serving field in the logged list; enter
+that weight first, then check Include in spins. Volume is never treated as grams.
+Selections and weights stay with that entry and date, without changing nutrition.
+
+
+For rice, salt weight includes the entered grams plus an additional 1.5 times
+that weight: 200 g rice adds 300 g extra, counting as 500 g for spins.
+The summary shows this rice bonus separately. Checked temporary plain-rice
+entries use the same rule. Rice treats/cakes do not get the rice bonus.
+This multiplier affects the salt calculation only, not calories or other macros.

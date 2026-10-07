@@ -31,7 +31,10 @@
     <tbody>
     {% for name, meta in items %}
       <tr>
-        <td>{{ name }}</td>
+        <td>{{ name }}{% if category == "Meal" and is_rice_for_spins(name) %}
+          <span class="rice-salt-badge">2.5&times; salt weight</span>
+          <span class="rice-salt-explanation">Salt spins count entered grams + 1.5&times; extra.<br>200 g rice counts as 500 g. Calories and macros use the entered grams.</span>
+        {% endif %}</td>
         <td>{{ (meta.cal_per_g*100)|round(1) }}</td>
         <td>{{ (meta.protein_per_g*100)|round(1) }}</td>
         <td>{{ (meta.carbs_per_g*100)|round(1) }}</td>

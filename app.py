@@ -93,6 +93,15 @@ def init_db() -> None:
             )
             """
         )
+        columns = {row["name"] for row in conn.execute("PRAGMA table_info(day_foods)")}
+        if "serving_g" not in columns:
+            conn.execute("ALTER TABLE day_foods ADD COLUMN serving_g REAL")
+            for row in conn.execute("SELECT id, serving_label FROM day_foods").fetchall():
+                grams = serving_grams_from_label(row["serving_label"])
+                if grams is not None:
+                    conn.execute("UPDATE day_foods SET serving_g = ? WHERE id = ?", (grams, row["id"]))
+        if "include_in_spins" not in columns:
+            conn.execute("ALTER TABLE day_foods ADD COLUMN include_in_spins INTEGER NOT NULL DEFAULT 0")
         conn.execute("CREATE INDEX IF NOT EXISTS day_foods_day ON day_foods(day)")
         conn.execute(
             """
@@ -231,6 +240,45 @@ def nutrition_number(payload: dict, key: str, optional: bool = False) -> float |
     return number
 
 
+def serving_grams_from_label(label: str) -> float | None:
+    """Only an explicit, unambiguous gram mass can describe one serving."""
+    matches = re.findall(r"(?<![0-9.,])([0-9]+(?:[.,][0-9]+)?)\s*(?:g|grams?)\b", label, re.I)
+    if len(matches) != 1:
+        return None
+    grams = float(matches[0].replace(",", "."))
+    return grams if 0 < grams <= 1_000_000 else None
+
+
+def is_rice_for_spins(name: str) -> bool:
+    key = name.strip().casefold()
+    return key in {"enriched rice", "rice", "white rice", "brown rice", "cooked rice",
+                   "cooked white rice", "cooked brown rice"} or key.startswith("rice,")
+
+
+app.jinja_env.globals["is_rice_for_spins"] = is_rice_for_spins
+
+def salt_spins_for(foods: dict, amounts: dict, entries: list[dict]) -> dict:
+    grams = 0.0
+    rice_bonus = 0.0
+    for name, meta in foods.items():
+        if meta.get("category") != "Meal" or name.startswith("Cal"):
+            continue
+        amount = float(amounts.get(name, 0))
+        grams += amount
+        if is_rice_for_spins(name):
+            rice_bonus += amount * 1.5
+    for entry in entries:
+        if not entry.get("include_in_spins") or entry.get("serving_g") is None:
+            continue
+        mass = float(entry["serving_g"]) * float(entry["servings"])
+        grams += mass
+        if is_rice_for_spins(entry.get("name", "")):
+            rice_bonus += mass * 1.5
+    grams += rice_bonus
+    return {"grams": round(grams, 3), "spins": round(grams / 29, 1),
+            "rice_bonus": round(rice_bonus, 3)}
+
+
 def day_food_response(day: str, **extra):
     return jsonify(
         ok=True,
@@ -270,6 +318,11 @@ def api_add_day_food():
             raise ValueError("Servings must be greater than zero.")
         nutrition = {key: nutrition_number(payload, key) for key in ("calories", "protein", "carbs", "fat")}
         nutrition["fiber"] = nutrition_number(payload, "fiber", optional=True)
+        serving_g = nutrition_number(payload, "serving_g", optional=True)
+        if serving_g is None:
+            serving_g = serving_grams_from_label(serving_label)
+        elif serving_g <= 0:
+            raise ValueError("Grams per serving must be greater than zero.")
         source_url = payload.get("source_url") or ""
         if not isinstance(source_url, str):
             raise ValueError("Invalid nutrition source.")
@@ -287,17 +340,47 @@ def api_add_day_food():
             """
             INSERT INTO day_foods(
                 day, name, serving_label, servings, calories, protein, carbs, fat,
-                fiber, source_url, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                fiber, source_url, created_at, serving_g
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 day, name.strip(), serving_label.strip(), servings,
                 nutrition["calories"], nutrition["protein"], nutrition["carbs"],
                 nutrition["fat"], nutrition["fiber"], source_url,
-                datetime.now().isoformat(timespec="seconds"),
+                datetime.now().isoformat(timespec="seconds"), serving_g,
             ),
         )
         entry = dict(conn.execute("SELECT * FROM day_foods WHERE id = ?", (cursor.lastrowid,)).fetchone())
+    return day_food_response(day, entry=entry)
+
+
+@app.patch("/api/day-food/<int:entry_id>/salt")
+def api_update_day_food_salt(entry_id: int):
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify(ok=False, error="Send the selected date and salt selection as JSON."), 400
+    try:
+        day = required_day(payload)
+        included = payload.get("include_in_spins")
+        if not isinstance(included, bool):
+            raise ValueError("Choose whether to include this food in spins.")
+        grams = nutrition_number(payload, "serving_g", optional=True) if "serving_g" in payload else None
+        if "serving_g" in payload and (grams is None or grams <= 0):
+            raise ValueError("Enter grams per serving greater than zero.")
+    except ValueError as exc:
+        return jsonify(ok=False, error=str(exc)), 400
+    init_db()
+    with db() as conn:
+        row = conn.execute("SELECT * FROM day_foods WHERE id = ? AND day = ?", (entry_id, day)).fetchone()
+        if row is None:
+            return jsonify(ok=False, error="That food was not found on this date."), 404
+        if grams is None:
+            grams = row["serving_g"]
+        if included and grams is None:
+            return jsonify(ok=False, error="Enter this food's grams per serving before including it in spins."), 400
+        conn.execute("UPDATE day_foods SET serving_g = ?, include_in_spins = ? WHERE id = ? AND day = ?",
+                     (grams, int(included), entry_id, day))
+        entry = dict(conn.execute("SELECT * FROM day_foods WHERE id = ?", (entry_id,)).fetchone())
     return day_food_response(day, entry=entry)
 
 
@@ -367,6 +450,7 @@ def dashboard():
     return render_template(
         "dashboard.html",
         day=day,
+        salt_spins=salt_spins_for(foods, amounts, day_foods),
         grouped=grouped,
         day_foods=day_foods,
         day_food_totals=day_food_totals_for(day_foods),
