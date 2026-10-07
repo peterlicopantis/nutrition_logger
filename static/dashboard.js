@@ -198,6 +198,7 @@ const saveChains = new WeakMap();
 const saveErrors = new Set();
 let pendingSaves = 0;
 function showSaveStatus() {
+  statusEl.classList.toggle("save-error", saveErrors.size > 0);
   statusEl.textContent = pendingSaves ? "Saving..." :
     saveErrors.size ? "Save failed - adjust the amount to retry" : "Saved";
 }
@@ -227,6 +228,21 @@ function saveInput(el) {
   return job;
 }
 document.querySelectorAll(".amount-control").forEach(attachAmountSlider);
+
+function adjacentDay(isoDay, offset) {
+  // UTC calendar arithmetic avoids daylight-saving changes shifting the date.
+  const timestamp = Date.parse(isoDay + "T00:00:00Z");
+  if (!Number.isFinite(timestamp)) return null;
+  const next = new Date(timestamp + offset * 86400000).toISOString().slice(0, 10);
+  return /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(next) &&
+    next >= "0001-01-01" && next <= "9999-12-31" ? next : null;
+}
+function navigateDay(offset) {
+  const next = adjacentDay(document.getElementById("dayPicker").value || DAY, offset);
+  if (next) window.location.href = "/?day=" + encodeURIComponent(next);
+}
+document.getElementById("previousDay").addEventListener("click", () => navigateDay(-1));
+document.getElementById("nextDay").addEventListener("click", () => navigateDay(1));
 
 document.getElementById("dayPicker").addEventListener("change", (e) => {
   if (e.target.value) window.location.href = "/?day="+encodeURIComponent(e.target.value);
