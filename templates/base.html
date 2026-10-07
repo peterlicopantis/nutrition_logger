@@ -388,6 +388,62 @@
       .dashboard-page .foodrow.rice-salt-row { min-height:54px; }
       .rice-salt-badge { font-size:11px; }
     }
+    .food-library-tools h2 { margin:0; font-size:1.1rem; }
+    .food-import-form { margin-top:18px; }
+    .food-import-form > button { margin-top:10px; }
+    .library-backups { margin-top:12px; overflow-wrap:anywhere; }
+    .library-backups summary, .food-advanced summary { cursor:pointer; color:var(--accent); }
+    .food-table-scroll { overflow-x:auto; }
+    .library-food-cell { min-width:190px; max-width:300px; overflow-wrap:anywhere; }
+    .food-advanced { margin-top:8px; font-size:12px; }
+    .food-advanced form { margin-top:10px; max-width:260px; }
+    .food-advanced input[type="number"] { max-width:130px; }
+    .food-advanced button, .remove-library-food button { padding:6px 10px; font-size:12px; }
+    .remove-library-food { margin-top:8px; }
+    @media (max-width:600px), (max-width:900px) and (pointer:coarse) {
+      .food-advanced button, .remove-library-food button { min-height:44px; }
+      .food-advanced summary { padding-block:12px; }
+    }
+    .food-import-selection { border:1px solid var(--border); border-radius:10px; padding:10px; margin:12px 0; min-width:0; }
+    .food-import-choices { max-height:320px; overflow-y:auto; margin-top:8px; }
+    .import-select-all, .import-food-choice { display:flex; gap:9px; align-items:center; min-height:44px; padding:6px 3px; }
+    .import-food-choice { border-top:1px solid var(--border); }
+    .import-select-all input, .import-food-choice input { width:18px; height:18px; margin:0; padding:0; flex-shrink:0; accent-color:var(--accent); }
+    .import-select-all span, .import-food-choice span { margin:0; min-width:0; overflow-wrap:anywhere; }
+    .import-food-choice small { display:block; color:var(--muted); margin-top:3px; }
+    .food-category-move { margin-top:8px; font-size:12px; }
+    .food-category-move summary { color:var(--accent); cursor:pointer; }
+    .food-category-move form { margin-top:10px; max-width:260px; }
+    .food-category-move label { margin-bottom:8px; }
+    .food-category-move button { padding:6px 10px; font-size:12px; }
+    .empty-category { font-size:12px; line-height:1.5; }
+    .history-library-note { margin:4px 0 8px; font-size:11px; }
+    @media (max-width:600px), (max-width:900px) and (pointer:coarse) {
+      .food-category-move summary { padding-block:12px; }
+      .food-category-move button { min-height:44px; }
+      .dashboard-page .mobile-food-tabs { display:flex; overflow-x:auto; }
+      .dashboard-page .mobile-group-tab { flex:0 0 auto; min-width:76px; max-width:180px; white-space:normal; overflow-wrap:anywhere; }
+    }
+    .food-category-title, .section h2 { overflow-wrap:anywhere; }
+    .food-category-move select { min-width:0; }
+    .checkbox-food-note { display:block; color:var(--muted); font-size:11px; line-height:1.5; margin-top:5px; }
+    .dashboard-page .foodrow.checkbox-food-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(110px,1fr); grid-template-areas:"name choice"; align-items:center; min-height:44px; }
+    .dashboard-page .checkbox-food-row .amount-heading { display:contents; }
+    .dashboard-page .checkbox-food-row .fname { grid-area:name; }
+    .dashboard-page .checkbox-food-row .amount-exact { grid-area:choice; display:flex; justify-content:flex-start; gap:8px; }
+    .dashboard-page .checkbox-food-row .food-checkbox { width:20px; height:20px; min-width:20px; min-height:20px; margin:0; padding:0; accent-color:var(--accent); cursor:pointer; }
+    .checkbox-portion { margin:0; min-width:0; font-size:11px; overflow-wrap:anywhere; cursor:pointer; }
+    @media (min-width:1024px) {
+      .dashboard-page .foodrow.checkbox-food-row { min-height:28px; height:auto; }
+      .dashboard-page .foodrow.checkbox-food-row.rice-salt-row { min-height:44px; }
+    }
+    @media (max-width:600px), (max-width:900px) and (pointer:coarse) {
+      .checkbox-portion { display:flex; align-items:center; min-height:44px; }
+      .dashboard-page .checkbox-food-row .fname { min-height:44px; display:flex; flex-direction:column; justify-content:center; }
+    }
+    .day-lock-notice { color:#bfdbfe; margin:6px 0 10px; }
+    .food-input:disabled, .foodrow .amount-range:disabled { opacity:.65; cursor:not-allowed; }
+    #dayLockButton[aria-pressed="true"] { border-color:var(--accent); color:var(--accent); }
   </style>
 </head>
 <body class="{% block body_class %}{% endblock %}">

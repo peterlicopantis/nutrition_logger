@@ -218,3 +218,97 @@ that weight: 200 g rice adds 300 g extra, counting as 500 g for spins.
 The summary shows this rice bonus separately. Checked temporary plain-rice
 entries use the same rule. Rice treats/cakes do not get the rice bonus.
 This multiplier affects the salt calculation only, not calories or other macros.
+
+
+## Food-library backups and advanced salt settings
+
+Saved foods offers Export all foods (JSON), Import foods, Remove on each food,
+and Advanced settings. Exports include all nutrition fields, categories, fiber
+fractions, and salt_extra_weight_factor. They do not include daily logs, which
+remain in melb.db. Imports accept the versioned MELB export or original foods.json.
+
+Merge adds new foods and updates matching names; Replace restores the library
+exactly from the file. Validation completes before any changes. Invalid files
+leave the library untouched. An automatic backup is saved before each import,
+removal, or advanced-setting change in food_backups/ (ignored by Git). The five
+most recent backups can be downloaded from the Saved foods page; older backups
+remain in that directory.
+
+Removing a food removes it from the current library and sliders. Existing daily
+amounts remain in the database and become usable again if the same food name is
+restored. Temporary daily food snapshots are independent of the library.
+
+Extra weight for salt spins is configured per food: 0 uses entered grams only;
+1.5 adds 150 percent extra, giving 2.5 times salt weight. The setting affects
+Meal foods only and does not alter macros. Rice defaults to 1.5 when an older
+file has no setting; an explicit 0 disables its bonus. Slider badges show the
+actual configured multiplier. Selected temporary foods preserve their own salt
+factor with their nutrition snapshot.
+
+When choosing an import file, a validated preview lists each food, its category,
+whether it updates an existing name, and any extra salt-weight setting. All foods
+start checked. Uncheck individual foods or use Select all to select/clear the
+list. Import selected foods applies only checked entries. Merge keeps unchecked
+current foods; Replace keeps only the selected backup foods. Previewing a file
+does not change the library or create an automatic backup.
+
+## Categories and past-day food libraries
+
+Dawg Bowl always exists, including when the food library is empty. It is the
+category used for current salt calculations. Existing Meal foods stay in Meal;
+use Move to another category on Saved foods to move individual foods into
+Dawg Bowl or any other category. New-category fields on food creation and food
+moves create custom categories. Empty categories are retained and exported.
+
+The SQLite database now stores food-library versions, including nutrition,
+categories, and salt settings. A past day uses the final library version known
+for that day; today's moves, removals, settings edits and imports do not replace
+past definitions. Past-day sliders can still update that day's amounts using
+their preserved nutrition. Older Meal-based salt rules stay with historical
+versions, while new/current versions use Dawg Bowl.
+
+Before the initial upgrade, the existing database is backed up automatically to
+database_backups/ (ignored by Git). Dates from before version tracking use the
+definitions available at the upgrade as their baseline. Changes made before
+tracking began cannot be reconstructed automatically without an older backup.
+Temporary foods already retain their own nutrition and salt snapshots.
+
+## Checkbox foods
+
+Choose Dashboard control: Checkbox when adding a new saved food. One check
+includes exactly the serving size and calories/macros entered in that form;
+unchecked contributes zero. Other foods remain sliders.
+
+Existing foods can switch control type under Advanced settings. Amount per check
+sets the fixed grams (or kcal for calorie-adjustment entries), using that food's
+saved nutrition. Saved foods displays the complete macros added by one check.
+Dawg Bowl checkbox foods also contribute their fixed mass and configured extra
+salt weight. The multiplier never changes nutrition.
+
+Control type and checkbox_amount are stored with food definitions, exported
+with backups, and included in library history. Converting a currently logged
+slider food to a checkbox, or changing its checked portion, updates today's
+nonzero amount to one configured portion. Past days retain their old control,
+portion and logged amount.
+
+## Locking a day
+
+Use Lock day on the dashboard to freeze the selected day's food library,
+categories, nutrition settings, amounts, temporary foods, salt selections and
+Health snapshot. The lock persists in melb.db across restarts. Library edits,
+imports, removals and checkbox-portion changes do not alter a locked day's view
+or totals. Entry edits, additions/removals, reset and Health imports are rejected
+by the server while locked, including requests from another tab or phone.
+
+Unlock day re-enables editing. A current/future unlocked day resumes using the
+current food library; historical days continue to use their historical version.
+If a checked portion changed while locked, it is applied when unlocking a current
+or future day. The lock button waits for pending quantity saves before capturing
+the snapshot. Apple Health export and navigation remain available while locked.
+
+
+Empty categories have a Remove category button on Saved foods. Removal deletes
+the category from the current library and dropdowns, with an automatic backup.
+Populated categories must have their foods moved or removed first. Dawg Bowl
+cannot be removed. Historical versions and locked-day snapshots retain their
+original category definitions.
