@@ -3,10 +3,13 @@
 {% block body_class %}dashboard-page{% endblock %}
 {% block content %}
 <div class="datebar">
-  <label style="flex:1;max-width:220px">
-    <span>Date</span>
-    <input id="dayPicker" type="date" value="{{ day }}">
-  </label>
+  <div class="date-controls">
+    <button id="previousDay" class="date-arrow" type="button" aria-label="Previous day" title="Previous day">&#8249;</button>
+    <label class="date-picker-label">
+      <input id="dayPicker" type="date" value="{{ day }}" aria-label="Date">
+    </label>
+    <button id="nextDay" class="date-arrow" type="button" aria-label="Next day" title="Next day">&#8250;</button>
+  </div>
   <span id="saveStatus" class="status" role="status">Saved</span>
 </div>
 
