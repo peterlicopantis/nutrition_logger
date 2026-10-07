@@ -1,5 +1,8 @@
 const dashboardConfig = JSON.parse(document.getElementById("dashboardConfig").dataset.config);
 const DAY = dashboardConfig.day;
+const DAY_LOCKED = Boolean(dashboardConfig.dayLocked);
+let dayLockChanging = false;
+const SALT_CATEGORY = dashboardConfig.saltCategory || "Dawg Bowl";
 const desktopLayout = window.matchMedia("(min-width:1024px)");
 const phoneLayout = window.matchMedia("(max-width:600px), (max-width:900px) and (pointer:coarse)");
 const compactPanels = [document.getElementById("dayFoodPanel"), document.getElementById("healthPanel")].filter(Boolean);
@@ -10,6 +13,13 @@ function setPanelLayout() {
 }
 const foodSections = [...document.querySelectorAll("#foodSections > .section")];
 const groupButtons = [...document.querySelectorAll(".mobile-group-tab")];
+function setCategoryColumns() {
+  document.getElementById("foodSections").style.gridTemplateColumns = desktopLayout.matches ?
+    "repeat("+Math.min(5, Math.max(1, foodSections.length))+", minmax(0, 1fr))" : "";
+}
+setCategoryColumns();
+desktopLayout.addEventListener("change", setCategoryColumns);
+
 const mobileSummary = document.getElementById("mobileSummary");
 let selectedCategory = foodSections[0]?.dataset.category;
 function syncMobileCategories(preserveFocus=false) {
@@ -100,18 +110,20 @@ function isRiceForSpins(name) {
 function computeSaltSpins() {
   let grams = 0, riceBonus = 0;
   for (const input of inputs) {
-    if (input.closest(".section")?.dataset.category === "Meal" &&
+    if (input.closest(".section")?.dataset.category === SALT_CATEGORY &&
         input.closest(".foodrow")?.dataset.unit === "g") {
       const mass = n(input.dataset.amount);
       grams += mass;
-      if (isRiceForSpins(input.dataset.name)) riceBonus += mass * 1.5;
+      riceBonus += mass * n(input.dataset.saltExtra);
     }
   }
   for (const food of dayFoods) {
     if (food.include_in_spins && Number(food.serving_g) > 0) {
       const mass = Number(food.serving_g) * n(food.servings);
       grams += mass;
-      if (isRiceForSpins(food.name)) riceBonus += mass * 1.5;
+      const factor = food.salt_extra_weight_factor ??
+        (isRiceForSpins(food.name) ? 1.5 : 0);
+      riceBonus += mass * n(factor);
     }
   }
   grams += riceBonus;
@@ -233,9 +245,10 @@ let pendingSaves = 0;
 function showSaveStatus() {
   statusEl.classList.toggle("save-error", saveErrors.size > 0);
   statusEl.textContent = pendingSaves ? "Saving..." :
-    saveErrors.size ? "Save failed - adjust the amount to retry" : "Saved";
+    saveErrors.size ? "Save failed - change the entry to retry" : "Saved";
 }
 function saveInput(el) {
+  if (DAY_LOCKED || dayLockChanging) return Promise.resolve();
   const amount = n(el.dataset.amount);
   pendingSaves++;
   showSaveStatus();
@@ -248,6 +261,7 @@ function saveInput(el) {
         headers:{"Content-Type":"application/json"},
         body:JSON.stringify({day:DAY, food_name:el.dataset.name, amount})
       });
+      if (res.status === 423) window.location.reload();
       if (!res.ok) throw new Error("Save failed");
       saveErrors.delete(el);
     } catch (error) {
@@ -261,6 +275,15 @@ function saveInput(el) {
   return job;
 }
 document.querySelectorAll(".amount-control").forEach(attachAmountSlider);
+document.querySelectorAll(".food-checkbox").forEach(checkbox => {
+  checkbox.addEventListener("change", () => {
+    if (DAY_LOCKED || dayLockChanging) return;
+    checkbox.dataset.amount = checkbox.checked ? checkbox.dataset.checkboxAmount : "0";
+    renderTotals();
+    saveInput(checkbox);
+  });
+});
+
 
 function adjacentDay(isoDay, offset) {
   // UTC calendar arithmetic avoids daylight-saving changes shifting the date.
@@ -367,7 +390,7 @@ function resetEditor() {
   renderFoodPreview();
 }
 function chooseMode(manual) {
-  if (savingFood) return;
+  if (savingFood || DAY_LOCKED || dayLockChanging) return;
   invalidateLookup();
   document.getElementById("lookupArea").hidden = manual;
   document.getElementById("lookupMode").setAttribute("aria-pressed", String(!manual));
@@ -380,7 +403,7 @@ function chooseMode(manual) {
 document.getElementById("lookupMode").addEventListener("click", () => chooseMode(false));
 document.getElementById("manualMode").addEventListener("click", () => chooseMode(true));
 document.getElementById("cancelDayFood").addEventListener("click", () => {
-  if (savingFood) return;
+  if (savingFood || DAY_LOCKED || dayLockChanging) return;
   resetEditor();
   dayFoodForm.hidden = true;
   setFoodStatus("");
@@ -550,7 +573,7 @@ function setupPortion(product) {
 
 dayFoodForm.addEventListener("input", renderFoodPreview);
 function selectProduct(product, suggestedServings) {
-  if (savingFood) return;
+  if (savingFood || DAY_LOCKED || dayLockChanging) return;
   resetEditor();
   fields.name.value = [product.name, product.brand].filter(Boolean).join(" — ").slice(0, 160);
   fields.serving_label.value = product.basis === "100g" ? "100 g" : (product.serving_label || "1 serving");
@@ -716,7 +739,7 @@ function renderDayFoods() {
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
     checkbox.checked = Boolean(food.include_in_spins);
-    checkbox.disabled = !(Number(food.serving_g) > 0) || updatingSaltFoods.has(food.id) || removingFoods.has(food.id);
+    checkbox.disabled = DAY_LOCKED || dayLockChanging || !(Number(food.serving_g) > 0) || updatingSaltFoods.has(food.id) || removingFoods.has(food.id);
     checkbox.setAttribute("aria-label", "Include "+food.name+" in salt shaker spins");
     checkbox.addEventListener("change", () => saveSaltSelection(food, checkbox.checked));
     const caption = document.createElement("span");
@@ -736,7 +759,7 @@ function renderDayFoods() {
       mass.step = "any";
       mass.inputMode = "decimal";
       mass.placeholder = "Weight needed";
-      mass.disabled = updatingSaltFoods.has(food.id) || removingFoods.has(food.id);
+      mass.disabled = DAY_LOCKED || dayLockChanging || updatingSaltFoods.has(food.id) || removingFoods.has(food.id);
       mass.setAttribute("aria-label", food.name+" grams per serving");
       mass.addEventListener("change", () => {
         const grams = numericField(mass);
@@ -757,7 +780,7 @@ function renderDayFoods() {
     remove.className = "btn danger";
     remove.type = "button";
     remove.textContent = removingFoods.has(food.id) ? "Removing…" : "Remove";
-    remove.disabled = removingFoods.has(food.id) || updatingSaltFoods.has(food.id);
+    remove.disabled = DAY_LOCKED || dayLockChanging || removingFoods.has(food.id) || updatingSaltFoods.has(food.id);
     remove.setAttribute("aria-label", "Remove "+food.name+" from "+DAY);
     remove.addEventListener("click", () => removeDayFood(food.id));
     item.append(content, remove);
@@ -765,7 +788,7 @@ function renderDayFoods() {
   }
 }
 async function saveSaltSelection(food, included, grams=food.serving_g) {
-  if (updatingSaltFoods.has(food.id) || removingFoods.has(food.id)) return;
+  if (DAY_LOCKED || dayLockChanging || updatingSaltFoods.has(food.id) || removingFoods.has(food.id)) return;
   updatingSaltFoods.add(food.id);
   renderDayFoods();
   setFoodStatus("");
@@ -786,7 +809,7 @@ async function saveSaltSelection(food, included, grams=food.serving_g) {
 }
 
 async function removeDayFood(id) {
-  if (removingFoods.has(id) || updatingSaltFoods.has(id)) return;
+  if (DAY_LOCKED || dayLockChanging || removingFoods.has(id) || updatingSaltFoods.has(id)) return;
   removingFoods.add(id);
   renderDayFoods();
   setFoodStatus("");
@@ -808,7 +831,7 @@ async function removeDayFood(id) {
 }
 dayFoodForm.addEventListener("submit", async event => {
   event.preventDefault();
-  if (savingFood || !dayFoodForm.reportValidity()) return;
+  if (DAY_LOCKED || dayLockChanging || savingFood || !dayFoodForm.reportValidity()) return;
   const values = readFoodValues();
   if (!values.name || !values.serving_label || !hasValidMacros(values)) {
     setFoodStatus("Enter a food name, serving size, and valid nonnegative macros. Servings eaten must be greater than zero.", true);
@@ -853,3 +876,54 @@ dayFoodForm.addEventListener("submit", async event => {
 });
 renderDayFoods();
 renderTotals();
+
+function applyDayEditingState() {
+  const blocked = DAY_LOCKED || dayLockChanging;
+  inputs.forEach(input => input.disabled = blocked);
+  document.querySelectorAll(".foodrow .amount-range, #dayFoodPanel input, #dayFoodPanel button, #dayFoodPanel select, #dayFoodPanel textarea")
+    .forEach(control => control.disabled = blocked);
+  document.getElementById("resetDayButton").disabled = blocked;
+  document.querySelectorAll("#dayFoodList input, #dayFoodList button")
+    .forEach(control => {
+      if (blocked) control.disabled = true;
+    });
+}
+const dayLockButton = document.getElementById("dayLockButton");
+const dayLockNotice = document.getElementById("dayLockNotice");
+dayLockButton.addEventListener("click", async () => {
+  if (dayLockChanging) return;
+  if (savingFood || removingFoods.size || updatingSaltFoods.size) {
+    dayLockNotice.hidden = false;
+    dayLockNotice.textContent = "Wait for the current food save to finish, then lock the day.";
+    return;
+  }
+  dayLockChanging = true;
+  dayLockButton.disabled = true;
+  dayLockButton.textContent = DAY_LOCKED ? "Unlocking..." : "Locking...";
+  invalidateLookup();
+  applyDayEditingState();
+  let reloading = false;
+  try {
+    // Finish all queued slider/checkbox releases before capturing the day.
+    await Promise.allSettled(inputs.map(input => saveChains.get(input)).filter(Boolean));
+    if (!DAY_LOCKED && saveErrors.size) throw new Error("An entry failed to save. Retry it before locking the day.");
+    await requestJson("/api/day-lock", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({day:DAY, locked:!DAY_LOCKED})
+    });
+    reloading = true;
+    window.location.reload();
+  } catch (error) {
+    dayLockNotice.hidden = false;
+    dayLockNotice.textContent = error instanceof TypeError ? "Could not change the day lock. Try again." : error.message;
+  } finally {
+    if (!reloading) {
+      dayLockChanging = false;
+      dayLockButton.disabled = false;
+      dayLockButton.textContent = DAY_LOCKED ? "Unlock day" : "Lock day";
+      renderDayFoods();
+      applyDayEditingState();
+    }
+  }
+});
+applyDayEditingState();

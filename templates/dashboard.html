@@ -13,6 +13,8 @@
   <span id="saveStatus" class="status" role="status">Saved</span>
 </div>
 
+{% if historical_library %}<p class="small history-library-note">Past-day library: food definitions and the {{ salt_category }} salt category are preserved.</p>{% endif %}
+
 <div class="mobile-summary" id="mobileSummary">
 <div class="metrics">
   <div class="metric"><div class="v" id="mCalories">{{ "%.0f"|format(totals.calories) }}</div><div class="k">Calories</div></div>
@@ -32,17 +34,19 @@
 
 <div class="dashboard-actions">
   {% set salt_summary = salt_spins|default({"spins":0, "grams":0}, true) %}
-  <div class="salt-spin-summary" role="status" aria-live="polite" title="Meal grams plus checked logged foods, with an extra 1.5 times rice weight, divided by 29.">
+  <div class="salt-spin-summary" role="status" aria-live="polite" title="{{ salt_category|default('Dawg Bowl') }} grams plus checked logged foods and configured extra salt weight, divided by 29.">
     <span>Salt shaker: ~<strong id="saltSpins">{{ salt_summary.spins }}</strong> spins</span>
     <span class="small"><span id="saltMealGrams">{{ salt_summary.grams }}</span> g salt weight &middot; 1 spin / 29 g</span>
-    <span class="small">Rice: +<span id="saltRiceBonus">{{ salt_summary.rice_bonus|default(0) }}</span> g (extra 1.5&times;)</span>
+    <span class="small">Extra salt weight: +<span id="saltRiceBonus">{{ salt_summary.rice_bonus|default(0) }}</span> g</span>
   </div>
+  <button class="btn" id="dayLockButton" type="button" aria-pressed="{{ 'true' if day_locked else 'false' }}">{{ 'Unlock day' if day_locked else 'Lock day' }}</button>
   <button class="btn primary" id="healthButton" type="button">Send totals to Apple Health</button>
   <form method="post" action="/reset" onsubmit="return confirm('Clear every entry for this date?')">
     <input type="hidden" name="day" value="{{ day }}">
-    <button class="btn danger" type="submit">Reset day</button>
+    <button id="resetDayButton" class="btn danger" type="submit">Reset day</button>
   </form>
 </div>
+<p id="dayLockNotice" class="small day-lock-notice" role="status"{% if not day_locked %} hidden{% endif %}>Day locked. Food entries, library settings and totals are frozen. Unlock to make changes.</p>
 <div class="small health-export-note">
   Apple Health logging is intended for one final export of the day. Re-running the Shortcut can create duplicate Health samples.
 </div>
@@ -130,34 +134,45 @@
   {% set section_index = loop.index %}
   <section class="section{% if not loop.first %} mobile-category-inactive{% endif %}" id="food-group-{{ section_index }}" data-category="{{ category|e }}">
     <h2>{{ category }}</h2>
+    {% if not items %}<p class="small empty-category">No foods here yet. <a href="{{ url_for('foods_page') }}">Add or move foods</a>.</p>{% endif %}
     {% for food in items %}
       {% set unit = "kcal" if food.name.startswith("Cal") else "g" %}
       {% set control_id = "amount-" ~ section_index ~ "-" ~ loop.index %}
       {% set default_max = 2000 if unit == "kcal" else 1000 %}
-      {% set rice_bonus = category == "Meal" and is_rice_for_spins(food.name) %}
-      <div class="foodrow amount-control{% if rice_bonus %} rice-salt-row{% endif %}" data-max="{{ default_max }}" data-step="10" data-unit="{{ unit }}">
+      {% set is_checkbox = food.input_mode|default("slider") == "checkbox" %}
+      {% set extra = salt_extra_factor(food.name, food) %}
+      {% set rice_bonus = category == salt_category|default("Dawg Bowl") and extra > 0 %}
+      <div class="foodrow {% if is_checkbox %}checkbox-food-row{% else %}amount-control{% endif %}{% if rice_bonus %} rice-salt-row{% endif %}" data-max="{{ default_max }}" data-step="10" data-unit="{{ unit }}">
         <div class="amount-heading">
-          <label class="fname" for="{{ control_id }}-slider" title="{{ food.name|e }}">{{ food.name }}{% if rice_bonus %}<span id="{{ control_id }}-salt-note" class="rice-salt-badge" title="For salt spins: entered grams + 1.5 times extra. 200 g rice counts as 500 g. Calories and macros use the entered grams.">2.5&times; salt weight</span>{% endif %}</label>
+          <label class="fname" for="{{ control_id if is_checkbox else control_id ~ '-slider' }}" title="{{ food.name|e }}">{{ food.name }}{% if rice_bonus %}<span id="{{ control_id }}-salt-note" class="rice-salt-badge" title="For salt spins: entered grams + {{ extra }} times extra. 200 g counts as {{ (200 * (1 + extra))|round(1) }} g. Calories and macros use the entered grams.">{{ (1 + extra)|round(3) }}&times; salt weight</span>{% endif %}</label>
           <div class="amount-exact">
             <input
               id="{{ control_id }}"
-              class="food-input amount-value"
-              type="text"
+              class="food-input {{ 'food-checkbox' if is_checkbox else 'amount-value' }}"
+              type="{{ 'checkbox' if is_checkbox else 'text' }}"
+              {% if is_checkbox %}
+              data-checkbox-amount="{{ food.checkbox_amount }}"
+              {% if food.amount %}checked{% endif %}
+              {% else %}
               inputmode="decimal"
               value="{{ food.amount if food.amount else 0 }}"
-              aria-label="{{ food.name|e }} exact amount in {{ unit }}"
+              {% endif %}
+              aria-label="{{ food.name|e }} {% if is_checkbox %}include one configured portion{% else %}exact amount in {{ unit }}{% endif %}"
               {% if rice_bonus %}aria-describedby="{{ control_id }}-salt-note"{% endif %}
               data-amount="{{ food.amount if food.amount else 0 }}"
               data-name="{{ food.name|e }}"
+              data-salt-extra="{{ extra }}"
               data-cal="{{ food.cal_per_g }}"
               data-protein="{{ food.protein_per_g }}"
               data-carbs="{{ food.carbs_per_g }}"
               data-fat="{{ food.fat_per_g }}"
               data-fiber="{{ food.fiber_per_g }}"
             >
-            <span class="amount-unit">{{ unit }}</span>
+            {% if is_checkbox %}<label class="checkbox-portion" for="{{ control_id }}">{{ food.checkbox_amount|round(3) }} {{ unit }} / check</label>
+            {% else %}<span class="amount-unit">{{ unit }}</span>{% endif %}
           </div>
         </div>
+        {% if not is_checkbox %}
         <input
           id="{{ control_id }}-slider"
           class="amount-range"
@@ -173,6 +188,7 @@
           <span>0</span>
           <span class="range-limit">{{ default_max }} {{ unit }}</span>
         </div>
+        {% endif %}
       </div>
     {% endfor %}
   </section>
@@ -181,6 +197,8 @@
 
 <div id="dashboardConfig" hidden data-config='{{ {
   "day": day,
+  "dayLocked": day_locked|default(false),
+  "saltCategory": salt_category|default("Dawg Bowl"),
   "shortcutName": shortcut_name,
   "healthBurn": ((health_snapshot.active_calories + health_snapshot.resting_calories)
     if health_snapshot and health_snapshot.active_calories is not none

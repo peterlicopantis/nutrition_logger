@@ -1,17 +1,52 @@
 {% extends "base.html" %}
-{% block title %}Add Food · MELB{% endblock %}
+{% block title %}Saved foods · MELB{% endblock %}
 {% block content %}
-<h1 style="font-size:1.35rem">Add a new food</h1>
-<p class="small">Enter the nutrition label for one serving. The app converts it to the same per-gram format used by your notebook.</p>
+<h1 style="font-size:1.35rem">Saved foods</h1>
 {% if message %}<div class="notice">{{ message }}</div>{% endif %}
 {% if error %}<div class="notice error">{{ error }}</div>{% endif %}
 
-<form method="post" class="panel">
+<section class="panel food-library-tools" aria-labelledby="libraryToolsHeading">
+  <h2 id="libraryToolsHeading">Food library backup</h2>
+  <p class="small">Export all current foods, nutrition values, categories, and advanced settings. Daily logs are stored separately.</p>
+  <a class="btn primary" href="{{ url_for('export_food_library') }}">Export all foods</a>
+  <form id="foodImportForm" action="{{ url_for('import_food_library') }}" method="post" enctype="multipart/form-data" class="food-import-form"
+        data-preview-url="{{ url_for('preview_food_import') }}">
+    <input type="hidden" name="selection_present" value="0">
+    <div class="formgrid">
+      <label><span>Food backup (.json)</span><input name="backup" type="file" accept=".json,application/json" required></label>
+      <label><span>Import mode</span><select name="mode">
+        <option value="merge">Merge: add foods and update matching names</option>
+        <option value="replace">Replace library with selected foods</option>
+      </select></label>
+    </div>
+    <p id="foodImportStatus" class="small" role="status" aria-live="polite">Choose a backup to preview its foods.</p>
+    <fieldset id="foodImportSelection" class="food-import-selection" hidden>
+      <legend>Choose foods to import</legend>
+      <label class="import-select-all"><input id="selectAllImportFoods" type="checkbox"><span>Select all</span></label>
+      <div id="foodImportChoices" class="food-import-choices"></div>
+      <p class="small">Only checked foods are imported. Merge keeps other current foods; Replace keeps only your selection.</p>
+    </fieldset>
+    <button id="importSelectedFoods" class="btn" type="submit" disabled>Import selected foods</button>
+  </form>
+  <p class="small">Imports also accept an original foods.json file. The full file is checked before any changes. Importing, removing, or changing advanced settings saves an automatic backup.</p>
+  {% if backups %}
+  <details class="library-backups">
+    <summary>Recent automatic backups</summary>
+    <ul>{% for backup in backups %}<li><a href="{{ url_for('download_food_backup', filename=backup) }}">{{ backup }}</a></li>{% endfor %}</ul>
+  </details>
+  {% endif %}
+</section>
+
+<h2 style="font-size:1.15rem">Add a new food</h2>
+<p class="small">Enter a nutrition label for one serving. For checkbox foods, one check includes exactly this serving size and these macros.</p>
+<form id="addFoodForm" action="{{ url_for('foods_page') }}" method="post" class="panel">
   <div class="formgrid">
     <label><span>Name</span><input name="name" required placeholder="e.g. New cereal"></label>
     <label><span>Category</span>
       <select name="category">{% for c in categories %}<option>{{ c }}</option>{% endfor %}</select>
     </label>
+    <label><span>Or create a new category</span><input name="new_category" maxlength="50" placeholder="New category (optional)"></label>
+    <label><span>Dashboard control</span><select name="input_mode"><option value="slider">Slider: choose grams eaten</option><option value="checkbox">Checkbox: include one serving</option></select></label>
     <label><span>Serving size (g)</span><input name="serving_g" type="number" step="0.01" min="0.01" required></label>
     <label><span>Calories / serving</span><input name="calories" type="number" step="0.01" min="0" required></label>
     <label><span>Protein (g)</span><input name="protein" type="number" step="0.01" min="0" value="0" required></label>
@@ -25,16 +60,72 @@
 <h2 style="font-size:1.15rem">Current foods</h2>
 {% for category, items in grouped.items() %}
 <div class="panel">
-  <strong>{{ category }}</strong>
+  <strong class="food-category-title">{{ category }}</strong>{% if category == "Dawg Bowl" %}<span class="small"> &middot; counted toward salt spins</span>{% endif %}
+  {% if not items %}
+    <p class="small">No foods in this category yet.</p>
+    {% if category != "Dawg Bowl" %}
+    <form class="remove-library-category" action="{{ url_for('remove_library_category') }}" method="post"
+          onsubmit="return confirm('Remove this empty category? Past days will stay unchanged and a backup will be saved.')">
+      <input type="hidden" name="category" value="{{ category }}">
+      <button class="btn danger" type="submit" aria-label="Remove empty {{ category }} category">Remove category</button>
+    </form>
+    {% endif %}
+  {% endif %}
+  <div class="food-table-scroll">
   <table style="margin-top:8px">
     <thead><tr><th>Food</th><th>kcal/100g</th><th>P</th><th>C</th><th>F</th><th>Fiber</th></tr></thead>
     <tbody>
     {% for name, meta in items %}
       <tr>
-        <td>{{ name }}{% if category == "Meal" and is_rice_for_spins(name) %}
-          <span class="rice-salt-badge">2.5&times; salt weight</span>
-          <span class="rice-salt-explanation">Salt spins count entered grams + 1.5&times; extra.<br>200 g rice counts as 500 g. Calories and macros use the entered grams.</span>
-        {% endif %}</td>
+        {% set extra = salt_extra_factor(name, meta) %}
+        <td class="library-food-cell">
+          <strong>{{ name }}</strong>
+          {% if meta.input_mode|default("slider") == "checkbox" %}
+          <span class="checkbox-food-note">Checkbox &middot; one check = {{ meta.checkbox_amount|round(3) }} {{ 'kcal' if name.startswith('Cal') else 'g' }}<br>
+            {{ (meta.cal_per_g * meta.checkbox_amount)|round(2) }} kcal &middot;
+            {{ (meta.protein_per_g * meta.checkbox_amount)|round(2) }} g protein &middot;
+            {{ (meta.carbs_per_g * meta.checkbox_amount)|round(2) }} g carbs &middot;
+            {{ (meta.fat_per_g * meta.checkbox_amount)|round(2) }} g fat &middot;
+            {{ (meta.fiber_per_g * meta.checkbox_amount)|round(2) }} g fiber</span>
+          {% endif %}
+
+          {% if category == "Dawg Bowl" and extra > 0 %}
+          <span class="rice-salt-badge">{{ (1 + extra)|round(3) }}&times; salt weight</span>
+          <span class="rice-salt-explanation">Salt weight: entered grams + {{ extra }}&times; extra.<br>200 g counts as {{ (200 * (1 + extra))|round(1) }} g. Calories and macros use the entered grams.</span>
+          {% endif %}
+          <details class="food-category-move">
+            <summary>Move to another category</summary>
+            <form action="{{ url_for('move_library_food') }}" method="post">
+              <input type="hidden" name="name" value="{{ name }}">
+              <label><span>Category</span><select name="category">
+                {% for choice in categories %}<option value="{{ choice }}"{% if choice == category %} selected{% endif %}>{{ choice }}</option>{% endfor %}
+              </select></label>
+              <label><span>Or create a new category</span><input name="new_category" maxlength="50" placeholder="New category (optional)"></label>
+              <p class="small">Past days keep their saved categories and food settings.</p>
+              <button class="btn" type="submit">Move food</button>
+            </form>
+          </details>
+          <details class="food-advanced">
+            <summary>Advanced settings</summary>
+            <form action="{{ url_for('update_food_advanced') }}" method="post">
+              <input type="hidden" name="name" value="{{ name }}">
+              <label><span>Dashboard control</span><select name="input_mode">
+                <option value="slider"{% if meta.input_mode|default("slider") == "slider" %} selected{% endif %}>Slider</option>
+                <option value="checkbox"{% if meta.input_mode|default("slider") == "checkbox" %} selected{% endif %}>Checkbox</option>
+              </select></label>
+              <label><span>Amount per check ({{ 'kcal' if name.startswith('Cal') else 'g' }})</span><input name="checkbox_amount" type="number" min="0.01" max="1000000" step="any" value="{{ meta.checkbox_amount|default(100) }}" inputmode="decimal" required></label>
+              <p class="small">One check includes this fixed portion using the saved nutrition values. Unchecked includes zero. Past days keep their original control and portion.</p>
+              <label><span>Extra weight for salt spins</span><input name="salt_extra_weight_factor" type="number" min="0" max="100" step="any" value="{{ extra }}" inputmode="decimal" required></label>
+              <p class="small">0 = entered weight only. 1.5 = add 150% extra, giving 2.5&times; salt weight. Applies when this food is in Dawg Bowl; nutrition is unchanged.</p>
+              <button class="btn" type="submit">Save advanced settings</button>
+            </form>
+          </details>
+          <form action="{{ url_for('remove_library_food') }}" method="post" class="remove-library-food"
+                onsubmit="return confirm('Remove this food from the library? An automatic backup will be saved.')">
+            <input type="hidden" name="name" value="{{ name }}">
+            <button class="btn danger" type="submit" aria-label="Remove {{ name }} from the library">Remove</button>
+          </form>
+        </td>
         <td>{{ (meta.cal_per_g*100)|round(1) }}</td>
         <td>{{ (meta.protein_per_g*100)|round(1) }}</td>
         <td>{{ (meta.carbs_per_g*100)|round(1) }}</td>
@@ -44,6 +135,8 @@
     {% endfor %}
     </tbody>
   </table>
+  </div>
 </div>
 {% endfor %}
+<script src="{{ url_for('static', filename='foods-import.js') }}" defer></script>
 {% endblock %}

@@ -6,6 +6,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from datetime import date
 from unittest.mock import patch
 from urllib.error import URLError
 
@@ -30,6 +31,12 @@ def label_product(**overrides):
     return product
 
 
+class TestDate(date):
+    @classmethod
+    def today(cls):
+        return date(2026, 10, 7)
+
+
 class DailyLoggingTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="melb-food-tests-")
@@ -37,7 +44,7 @@ class DailyLoggingTests(unittest.TestCase):
         self.foods_path = folder / "foods.json"
         self.foods = {"Regular food": {
             "cal_per_g": 10, "protein_per_g": 1, "carbs_per_g": 2,
-            "fat_per_g": 0.5, "fiber_per_g": 0.2, "category": "Meal",
+            "fat_per_g": 0.5, "fiber_per_g": 0.2, "category": "Dawg Bowl",
         }}
         self.foods_path.write_text(json.dumps(self.foods), encoding="utf-8")
         (folder / "config.json").write_text(
@@ -45,6 +52,7 @@ class DailyLoggingTests(unittest.TestCase):
             encoding="utf-8",
         )
         self.patchers = [
+            patch.object(melb, "date", TestDate),
             patch.object(melb, "DB_PATH", folder / "test.db"),
             patch.object(melb, "FOODS_PATH", self.foods_path),
             patch.object(melb, "CONFIG_PATH", folder / "config.json"),
@@ -506,9 +514,9 @@ class SaltSpinTests(unittest.TestCase):
         payload.update(overrides)
         return self.client.patch(f"/api/day-food/{entry['id']}/salt", json=payload)
 
-    def test_only_meal_grams_and_checked_temporary_mass_count(self):
-        foods={"Meal":{"category":"Meal"}, "Cream":{"category":"Cream"},
-               "Test":{"category":"Test"}, "Cal":{"category":"Meal"}}
+    def test_only_dawg_bowl_grams_and_checked_temporary_mass_count(self):
+        foods={"Meal":{"category":"Dawg Bowl"}, "Cream":{"category":"Cream"},
+               "Test":{"category":"Test"}, "Cal":{"category":"Dawg Bowl"}}
         amounts={"Meal":290, "Cream":500, "Test":600, "Cal":900}
         entries=[{"serving_g":61,"servings":2,"include_in_spins":True},
                  {"serving_g":100,"servings":4,"include_in_spins":False}]
@@ -516,7 +524,7 @@ class SaltSpinTests(unittest.TestCase):
         self.assertEqual(melb.salt_spins_for({}, {}, []),{"grams":0,"spins":0,"rice_bonus":0})
 
     def test_rice_adds_extra_one_and_a_half_times_mass_only_for_spins(self):
-        foods={"Enriched Rice":{"category":"Meal"}, "Carrot":{"category":"Meal"}}
+        foods={"Enriched Rice":{"category":"Dawg Bowl"}, "Carrot":{"category":"Dawg Bowl"}}
         result=melb.salt_spins_for(foods,{"Enriched Rice":200,"Carrot":58},[])
         self.assertEqual(result,{"grams":558,"spins":19.2,"rice_bonus":300})
         rice={"name":"Rice, white, cooked", "serving_g":100,"servings":2,"include_in_spins":True}
