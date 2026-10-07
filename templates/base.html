@@ -356,6 +356,18 @@
       .dashboard-page .mobile-summary .metrics { grid-template-columns:repeat(6,minmax(0,1fr)); }
       .dashboard-page .mobile-summary .metric .v { font-size:17px; }
     }
+    .salt-spin-summary { display:flex; flex-wrap:wrap; align-items:center; gap:4px 12px; padding:6px 10px; border:1px solid var(--border); border-radius:9px; font-size:.88rem; }
+    .logged-salt-controls { min-width:0; max-width:100%; display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; }
+    .salt-inclusion { min-width:0; display:flex; align-items:center; gap:7px; cursor:pointer; min-height:32px; }
+    .salt-inclusion span { min-width:0; overflow-wrap:anywhere; margin:0; font-size:.84rem; }
+    .salt-inclusion input[type="checkbox"] { width:18px; height:18px; min-height:18px; padding:0; margin:0; accent-color:var(--accent); }
+    .logged-mass-label { display:flex; flex-wrap:wrap; align-items:center; gap:8px; font-size:.82rem; }
+    .logged-mass-label input { width:125px; min-width:0; padding:6px; }
+    @media (max-width:600px), (max-width:900px) and (pointer:coarse) {
+      .salt-spin-summary { width:100%; justify-content:center; text-align:center; font-size:13px; }
+      .salt-inclusion { min-height:44px; }
+      .logged-mass-label input { min-height:44px; font-size:16px; }
+    }
     .daily-log-panel { margin:8px 0; padding:10px 12px; }
     .daily-log-heading { font-size:14px; line-height:20px; margin:0 0 4px; }
     .daily-log-panel .day-food-item { padding:8px 0; }
@@ -363,6 +375,18 @@
     @media (min-width:1024px) {
       .daily-log-panel .day-food-item > div { display:flex; flex-wrap:wrap; align-items:center; gap:4px 12px; }
       .daily-log-panel .day-food-item p { margin:0; }
+    }
+    .rice-salt-badge { display:block; width:fit-content; margin:3px 0 0; padding:1px 5px; border:1px solid #385b82; border-radius:5px; background:#142b44; color:#bfdbfe; font-size:10px; font-weight:650; line-height:15px; white-space:nowrap; }
+    .rice-salt-explanation { display:block; max-width:270px; margin-top:5px; color:var(--muted); font-size:11px; line-height:1.4; }
+    .dashboard-page .rice-salt-row { background:rgba(96,165,250,.045); border-radius:5px; }
+    .dashboard-page .rice-salt-row .fname { white-space:normal; overflow:visible; }
+    @media (min-width:1024px) {
+      .dashboard-page .foodrow.rice-salt-row { height:auto; min-height:42px; }
+      .dashboard-page .rice-salt-row .rice-salt-badge { margin:0 0 0 auto; }
+    }
+    @media (max-width:600px), (max-width:900px) and (pointer:coarse) {
+      .dashboard-page .foodrow.rice-salt-row { min-height:54px; }
+      .rice-salt-badge { font-size:11px; }
     }
   </style>
 </head>

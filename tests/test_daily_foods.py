@@ -496,5 +496,106 @@ class TypicalPortionTests(unittest.TestCase):
         self.assertFalse(result["requires_weight"])
 
 
+
+class SaltSpinTests(unittest.TestCase):
+    setUp = DailyLoggingTests.setUp
+    add = DailyLoggingTests.add
+
+    def salt(self, entry, **overrides):
+        payload = {"day":"2026-10-06", "include_in_spins":True}
+        payload.update(overrides)
+        return self.client.patch(f"/api/day-food/{entry['id']}/salt", json=payload)
+
+    def test_only_meal_grams_and_checked_temporary_mass_count(self):
+        foods={"Meal":{"category":"Meal"}, "Cream":{"category":"Cream"},
+               "Test":{"category":"Test"}, "Cal":{"category":"Meal"}}
+        amounts={"Meal":290, "Cream":500, "Test":600, "Cal":900}
+        entries=[{"serving_g":61,"servings":2,"include_in_spins":True},
+                 {"serving_g":100,"servings":4,"include_in_spins":False}]
+        self.assertEqual(melb.salt_spins_for(foods,amounts,entries),{"grams":412,"spins":14.2,"rice_bonus":0})
+        self.assertEqual(melb.salt_spins_for({}, {}, []),{"grams":0,"spins":0,"rice_bonus":0})
+
+    def test_rice_adds_extra_one_and_a_half_times_mass_only_for_spins(self):
+        foods={"Enriched Rice":{"category":"Meal"}, "Carrot":{"category":"Meal"}}
+        result=melb.salt_spins_for(foods,{"Enriched Rice":200,"Carrot":58},[])
+        self.assertEqual(result,{"grams":558,"spins":19.2,"rice_bonus":300})
+        rice={"name":"Rice, white, cooked", "serving_g":100,"servings":2,"include_in_spins":True}
+        self.assertEqual(melb.salt_spins_for({}, {}, [rice]),{"grams":500,"spins":17.2,"rice_bonus":300})
+        rice["include_in_spins"]=False
+        self.assertEqual(melb.salt_spins_for({}, {}, [rice])["grams"],0)
+        self.assertFalse(melb.is_rice_for_spins("Rice Krispies Treats"))
+        self.assertFalse(melb.is_rice_for_spins("Rice cake"))
+
+    def test_checkbox_persists_and_does_not_change_nutrition(self):
+        response=self.add(serving_g=61, servings=2)
+        entry=response.json["entry"]
+        self.assertEqual(entry["include_in_spins"],0)
+        self.assertEqual(entry["serving_g"],61)
+        selected=self.salt(entry)
+        self.assertEqual(selected.status_code,200)
+        self.assertEqual(selected.json["entry"]["include_in_spins"],1)
+        self.assertEqual(selected.json["totals"],response.json["totals"])
+        stored=melb.load_day_foods("2026-10-06")[0]
+        self.assertEqual(stored["include_in_spins"],1)
+        self.assertEqual(melb.salt_spins_for({}, {}, [stored])["grams"],122)
+        html=self.client.get("/?day=2026-10-06").get_data(as_text=True)
+        self.assertIn("Salt shaker",html)
+        self.assertIn('id="saltMealGrams">122.0',html)
+        self.assertEqual(self.salt(entry,include_in_spins=False).status_code,200)
+        self.assertEqual(melb.salt_spins_for({}, {}, melb.load_day_foods("2026-10-06"))["grams"],0)
+
+    def test_selection_is_date_scoped_and_deleted_entries_do_not_count(self):
+        entry=self.add(serving_g=58).json["entry"]
+        self.assertEqual(self.salt(entry,day="2026-10-07").status_code,404)
+        self.assertEqual(self.salt(entry).status_code,200)
+        self.assertEqual(melb.load_day_foods("2026-10-07"),[])
+        self.client.delete(f"/api/day-food/{entry['id']}",json={"day":"2026-10-06"})
+        self.assertEqual(self.salt(entry).status_code,404)
+        self.assertEqual(melb.salt_spins_for({}, {}, melb.load_day_foods("2026-10-06"))["grams"],0)
+
+    def test_unknown_mass_requires_explicit_grams_and_never_assumes_volume(self):
+        entry=self.add(serving_label="1 can (250 ml)").json["entry"]
+        self.assertIsNone(entry["serving_g"])
+        self.assertEqual(self.salt(entry).status_code,400)
+        response=self.salt(entry,serving_g=123.5,include_in_spins=False)
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(response.json["entry"]["serving_g"],123.5)
+        self.assertEqual(self.salt(entry).status_code,200)
+        self.assertEqual(melb.salt_spins_for({}, {}, melb.load_day_foods("2026-10-06"))["grams"],247)
+
+    def test_invalid_weights_selections_and_dates_are_rejected(self):
+        entry=self.add(serving_g=61).json["entry"]
+        for weight in [0,-1,True,float("nan"),float("inf"),1_000_001,[],None]:
+            with self.subTest(weight=weight):
+                self.assertEqual(self.salt(entry,serving_g=weight).status_code,400)
+                self.assertEqual(self.add(serving_g=weight).status_code,400 if weight is not None else 200)
+        for selection in [1,"true",None,[]]:
+            self.assertEqual(self.salt(entry,include_in_spins=selection).status_code,400)
+        self.assertEqual(self.salt(entry,day="2026-02-30").status_code,400)
+
+    def test_explicit_label_mass_is_used_but_ambiguous_labels_are_not(self):
+        self.assertEqual(melb.serving_grams_from_label("1 medium carrot (~61 g)"),61)
+        self.assertEqual(melb.serving_grams_from_label("1 bar (22 grams)"),22)
+        self.assertIsNone(melb.serving_grams_from_label("1 cup (250 ml)"))
+        self.assertIsNone(melb.serving_grams_from_label("30 g rice + 20 g sauce"))
+
+    def test_old_database_migrates_without_changing_logged_macros(self):
+        with melb.db() as conn:
+            conn.execute("DROP TABLE day_foods")
+            conn.execute("""CREATE TABLE day_foods (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT NOT NULL,
+                name TEXT NOT NULL, serving_label TEXT NOT NULL, servings REAL NOT NULL,
+                calories REAL NOT NULL, protein REAL NOT NULL, carbs REAL NOT NULL,
+                fat REAL NOT NULL, fiber REAL, source_url TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL)""")
+            for label in ["1 medium carrot (~61 g)","1 can (250 ml)"]:
+                conn.execute("""INSERT INTO day_foods(day,name,serving_label,servings,calories,protein,carbs,fat,created_at)
+                             VALUES (?,?,?,?,?,?,?,?,?)""",("2026-10-06","Existing food",label,2,25.01,1,2,3,"before"))
+        melb.init_db()
+        melb.init_db()
+        entries=melb.load_day_foods("2026-10-06")
+        self.assertEqual([e["serving_g"] for e in entries],[61,None])
+        self.assertTrue(all(e["include_in_spins"]==0 and e["calories"]==25.01 and e["servings"]==2 for e in entries))
+
+
 if __name__ == "__main__":
     unittest.main()

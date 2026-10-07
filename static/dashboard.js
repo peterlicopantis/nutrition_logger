@@ -92,7 +92,40 @@ function computeTotals() {
   Object.keys(t).forEach(k => t[k] = rounded(t[k]));
   return t;
 }
+function isRiceForSpins(name) {
+  const key = String(name || "").trim().toLowerCase();
+  return ["enriched rice", "rice", "white rice", "brown rice", "cooked rice",
+    "cooked white rice", "cooked brown rice"].includes(key) || key.startsWith("rice,");
+}
+function computeSaltSpins() {
+  let grams = 0, riceBonus = 0;
+  for (const input of inputs) {
+    if (input.closest(".section")?.dataset.category === "Meal" &&
+        input.closest(".foodrow")?.dataset.unit === "g") {
+      const mass = n(input.dataset.amount);
+      grams += mass;
+      if (isRiceForSpins(input.dataset.name)) riceBonus += mass * 1.5;
+    }
+  }
+  for (const food of dayFoods) {
+    if (food.include_in_spins && Number(food.serving_g) > 0) {
+      const mass = Number(food.serving_g) * n(food.servings);
+      grams += mass;
+      if (isRiceForSpins(food.name)) riceBonus += mass * 1.5;
+    }
+  }
+  grams += riceBonus;
+  return {grams, spins:grams / 29, riceBonus};
+}
+function renderSaltSpins() {
+  const result = computeSaltSpins();
+  document.getElementById("saltSpins").textContent = rounded(result.spins, 1);
+  document.getElementById("saltMealGrams").textContent = rounded(result.grams, 1);
+  document.getElementById("saltRiceBonus").textContent = rounded(result.riceBonus, 1);
+}
+
 function renderTotals() {
+  renderSaltSpins();
   const t = computeTotals();
   document.getElementById("mCalories").textContent = Math.round(t.calories);
   document.getElementById("mProtein").textContent = t.protein.toFixed(1)+"g";
@@ -292,6 +325,7 @@ let lookupPendingQuery = "";
 let lookupInputValue = foodQuery.value;
 const LOOKUP_TIMEOUT_MS = 25000;
 const removingFoods = new Set();
+const updatingSaltFoods = new Set();
 
 function trustedSource(value) {
   if (typeof value !== "string" || value !== value.trim()) return null;
@@ -361,7 +395,8 @@ function readFoodValues() {
     name:fields.name.value.trim(),
     serving_label:fields.serving_label.value.trim(),
     servings:parseAmount(fields.servings.value) ?? NaN,
-    source_url:selectedSource
+    source_url:selectedSource,
+    serving_g:portionState && portionIsValid() ? portionState.grams : null
   };
   nutrientKeys.forEach(key => values[key] = numericField(fields[key], key === "fiber"));
   return values;
@@ -674,19 +709,84 @@ function renderDayFoods() {
     source.className = "small";
     addSourceLink(source, food.source_url);
     content.append(name, serving, macros, source);
+    const saltControls = document.createElement("div");
+    saltControls.className = "logged-salt-controls";
+    const saltLabel = document.createElement("label");
+    saltLabel.className = "salt-inclusion";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = Boolean(food.include_in_spins);
+    checkbox.disabled = !(Number(food.serving_g) > 0) || updatingSaltFoods.has(food.id) || removingFoods.has(food.id);
+    checkbox.setAttribute("aria-label", "Include "+food.name+" in salt shaker spins");
+    checkbox.addEventListener("change", () => saveSaltSelection(food, checkbox.checked));
+    const caption = document.createElement("span");
+    caption.textContent = Number(food.serving_g) > 0 ?
+      "Include in spins ("+rounded(Number(food.serving_g)*n(food.servings), 1)+" g)" :
+      "Include in spins";
+    saltLabel.append(checkbox, caption);
+    saltControls.appendChild(saltLabel);
+    if (!(Number(food.serving_g) > 0)) {
+      const massLabel = document.createElement("label");
+      massLabel.className = "logged-mass-label";
+      massLabel.textContent = "Grams per serving";
+      const mass = document.createElement("input");
+      mass.type = "number";
+      mass.min = "0";
+      mass.max = "1000000";
+      mass.step = "any";
+      mass.inputMode = "decimal";
+      mass.placeholder = "Weight needed";
+      mass.disabled = updatingSaltFoods.has(food.id) || removingFoods.has(food.id);
+      mass.setAttribute("aria-label", food.name+" grams per serving");
+      mass.addEventListener("change", () => {
+        const grams = numericField(mass);
+        if (!Number.isFinite(grams) || grams <= 0 || grams > 1000000) {
+          mass.setCustomValidity("Enter grams per serving greater than zero, up to 1,000,000.");
+          mass.reportValidity();
+          return;
+        }
+        mass.setCustomValidity("");
+        saveSaltSelection(food, false, grams);
+      });
+      mass.addEventListener("input", () => mass.setCustomValidity(""));
+      massLabel.appendChild(mass);
+      saltControls.appendChild(massLabel);
+    }
+    content.appendChild(saltControls);
     const remove = document.createElement("button");
     remove.className = "btn danger";
     remove.type = "button";
     remove.textContent = removingFoods.has(food.id) ? "Removing…" : "Remove";
-    remove.disabled = removingFoods.has(food.id);
+    remove.disabled = removingFoods.has(food.id) || updatingSaltFoods.has(food.id);
     remove.setAttribute("aria-label", "Remove "+food.name+" from "+DAY);
     remove.addEventListener("click", () => removeDayFood(food.id));
     item.append(content, remove);
     list.appendChild(item);
   }
 }
+async function saveSaltSelection(food, included, grams=food.serving_g) {
+  if (updatingSaltFoods.has(food.id) || removingFoods.has(food.id)) return;
+  updatingSaltFoods.add(food.id);
+  renderDayFoods();
+  setFoodStatus("");
+  try {
+    const payload = {day:DAY, include_in_spins:included};
+    if (grams != null) payload.serving_g = grams;
+    const data = await requestJson("/api/day-food/"+encodeURIComponent(food.id)+"/salt", {
+      method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)
+    });
+    dayFoods = dayFoods.map(entry => entry.id === food.id ? data.entry : entry);
+    updateDayFoods(data);
+  } catch (error) {
+    setFoodStatus(error instanceof TypeError ? "Could not save the salt selection. Try again." : error.message, true);
+  } finally {
+    updatingSaltFoods.delete(food.id);
+    renderDayFoods();
+  }
+}
+
 async function removeDayFood(id) {
-  if (removingFoods.has(id)) return;
+  if (removingFoods.has(id) || updatingSaltFoods.has(id)) return;
   removingFoods.add(id);
   renderDayFoods();
   setFoodStatus("");
