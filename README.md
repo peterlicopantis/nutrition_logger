@@ -314,3 +314,17 @@ cannot be removed. Historical versions and locked-day snapshots retain their
 original category definitions.
 
 In **Saved foods**, use **Up** and **Down** beneath a food to reorder it within its category on the homepage. Order is saved in food backups and daily library history; past and locked days keep their saved order.
+
+### Local food library and Git
+
+Your editable `foods.json` and `categories.json` are local data and are ignored
+by Git, like `melb.db`. A fresh clone creates `foods.json` from the tracked
+`foods.default.json` on first use and derives its categories automatically.
+Existing local files, including an intentionally empty library, are preserved.
+Use Saved foods export/import to transfer or back up your personalized library.
+
+When upgrading an older checkout, commit the staged removal of the local files
+from Git along with the starter-library change. The files remain on disk.
+Older branches that still track these filenames can overwrite ignored local
+files during checkout; back up your library and bring this change into those
+branches before switching to them.

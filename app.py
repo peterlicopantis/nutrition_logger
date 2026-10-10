@@ -22,6 +22,7 @@ from food_library import (FORMAT as FOOD_BACKUP_FORMAT, VERSION as FOOD_BACKUP_V
 
 BASE_DIR = Path(__file__).resolve().parent
 FOODS_PATH = BASE_DIR / "foods.json"
+DEFAULT_FOODS_PATH = BASE_DIR / "foods.default.json"
 DB_PATH = BASE_DIR / "melb.db"
 CONFIG_PATH = BASE_DIR / "config.json"
 SALT_CATEGORY = PERMANENT_CATEGORY
@@ -33,6 +34,15 @@ FOOD_LIBRARY_LOCK = threading.RLock()
 
 
 def load_foods() -> dict:
+    with FOOD_LIBRARY_LOCK:
+        if not FOODS_PATH.exists():
+            # Local data is ignored by Git; seed it only on a fresh installation.
+            starter = validate_foods(json.loads(DEFAULT_FOODS_PATH.read_text(encoding="utf-8")))
+            try:
+                with FOODS_PATH.open("x", encoding="utf-8") as destination:
+                    json.dump(starter, destination, indent=2, allow_nan=False)
+            except FileExistsError:
+                pass
     with FOODS_PATH.open("r", encoding="utf-8") as f:
         foods = json.load(f)
     for name, meta in foods.items():

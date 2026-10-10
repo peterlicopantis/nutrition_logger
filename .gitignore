@@ -8,3 +8,6 @@ food_backups/
 database_backups/
 categories.json
 foods.json
+
+foods.json.tmp
+categories.json.tmp
