@@ -400,6 +400,12 @@
     .food-advanced input[type="number"] { max-width:130px; }
     .food-advanced button, .remove-library-food button { padding:6px 10px; font-size:12px; }
     .remove-library-food { margin-top:8px; }
+    .food-reorder { display:flex; gap:6px; margin-top:8px; }
+    .food-reorder button { padding:6px 10px; font-size:12px; }
+    .food-reorder button:disabled { opacity:.35; cursor:default; }
+    @media (max-width:900px) and (pointer:coarse), (max-width:600px) {
+      .food-reorder button { min-height:44px; }
+    }
     @media (max-width:600px), (max-width:900px) and (pointer:coarse) {
       .food-advanced button, .remove-library-food button { min-height:44px; }
       .food-advanced summary { padding-block:12px; }

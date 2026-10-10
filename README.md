@@ -312,3 +312,5 @@ the category from the current library and dropdowns, with an automatic backup.
 Populated categories must have their foods moved or removed first. Dawg Bowl
 cannot be removed. Historical versions and locked-day snapshots retain their
 original category definitions.
+
+In **Saved foods**, use **Up** and **Down** beneath a food to reorder it within its category on the homepage. Order is saved in food backups and daily library history; past and locked days keep their saved order.
