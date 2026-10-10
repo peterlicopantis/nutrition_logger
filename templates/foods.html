@@ -58,8 +58,9 @@
 </form>
 
 <h2 style="font-size:1.15rem">Current foods</h2>
+<p class="small">Use Up and Down to change each category's order on the homepage. Past and locked days keep their saved order.</p>
 {% for category, items in grouped.items() %}
-<div class="panel">
+<div class="panel" id="food-category-{{ loop.index0 }}">
   <strong class="food-category-title">{{ category }}</strong>{% if category == "Dawg Bowl" %}<span class="small"> &middot; counted toward salt spins</span>{% endif %}
   {% if not items %}
     <p class="small">No foods in this category yet.</p>
@@ -80,6 +81,11 @@
         {% set extra = salt_extra_factor(name, meta) %}
         <td class="library-food-cell">
           <strong>{{ name }}</strong>
+          <form class="food-reorder" action="{{ url_for('reorder_library_food') }}" method="post">
+            <input type="hidden" name="name" value="{{ name }}">
+            <button class="btn" type="submit" name="direction" value="up" aria-label="Move {{ name }} up"{% if loop.first %} disabled{% endif %}>&uarr; Up</button>
+            <button class="btn" type="submit" name="direction" value="down" aria-label="Move {{ name }} down"{% if loop.last %} disabled{% endif %}>&darr; Down</button>
+          </form>
           {% if meta.input_mode|default("slider") == "checkbox" %}
           <span class="checkbox-food-note">Checkbox &middot; one check = {{ meta.checkbox_amount|round(3) }} {{ 'kcal' if name.startswith('Cal') else 'g' }}<br>
             {{ (meta.cal_per_g * meta.checkbox_amount)|round(2) }} kcal &middot;

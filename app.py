@@ -138,7 +138,7 @@ def initialize_library_history() -> None:
 def record_library_version(foods: dict, categories: list[str]) -> None:
     with db() as conn:
         latest = conn.execute("SELECT * FROM food_library_versions ORDER BY id DESC LIMIT 1").fetchone()
-        if latest and json.loads(latest["foods_json"]) == foods and json.loads(latest["categories_json"]) == categories and latest["salt_category"] == SALT_CATEGORY:
+        if latest and list(json.loads(latest["foods_json"]).items()) == list(foods.items()) and json.loads(latest["categories_json"]) == categories and latest["salt_category"] == SALT_CATEGORY:
             return
         normalize_checkbox_entries(conn, foods)
         conn.execute("""INSERT INTO food_library_versions(effective_day, foods_json, categories_json, salt_category, created_at)
@@ -939,6 +939,32 @@ def remove_library_category():
         backup_food_library(foods)
         save_foods(foods, categories=[name for name in categories if name != category])
     return foods_page_result(message=f"Removed the empty {category} category. Past days are unchanged; a backup was saved.")
+
+
+@app.post("/foods/reorder")
+def reorder_library_food():
+    init_db()
+    name = request.form.get("name", "")
+    direction = request.form.get("direction", "")
+    if direction not in ("up", "down"):
+        return foods_page_result(error="Choose up or down to reorder a food.", status=400)
+    with FOOD_LIBRARY_LOCK:
+        foods = load_foods()
+        if name not in foods:
+            return foods_page_result(error="That food is no longer in the library.", status=404)
+        category = foods[name]["category"]
+        categories = load_categories(foods)
+        siblings = [key for key, meta in foods.items() if meta["category"] == category]
+        position = siblings.index(name)
+        target = position + (-1 if direction == "up" else 1)
+        if 0 <= target < len(siblings):
+            # Swap only this category's slots, preserving other categories and metadata.
+            names = list(foods)
+            first, second = names.index(name), names.index(siblings[target])
+            names[first], names[second] = names[second], names[first]
+            backup_food_library(foods)
+            save_foods({key: foods[key] for key in names}, categories=categories)
+        return redirect(url_for("foods_page", _anchor=f"food-category-{categories.index(category)}"), code=303)
 
 
 @app.post("/foods/move")

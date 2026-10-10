@@ -6,3 +6,5 @@ __pycache__/
 logs/
 food_backups/
 database_backups/
+categories.json
+foods.json
