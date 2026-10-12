@@ -150,6 +150,31 @@ function renderTotals() {
   document.getElementById("fiberNotice").hidden = !dayFoods.some(food => food.fiber == null);
 }
 const amountControls = new Map();
+const scheduledAmountSaves = new Map();
+function scheduleAmountSave(input, commit) {
+  if (!input.classList.contains("food-input") || DAY_LOCKED || dayLockChanging) return;
+  clearTimeout(scheduledAmountSaves.get(input)?.timer);
+  const timer = setTimeout(() => {
+    scheduledAmountSaves.delete(input);
+    commit();
+  }, 250);
+  scheduledAmountSaves.set(input, {timer, commit});
+}
+function cancelAmountSave(input) {
+  clearTimeout(scheduledAmountSaves.get(input)?.timer);
+  scheduledAmountSaves.delete(input);
+}
+function flushAmountSaves() {
+  for (const [input, job] of [...scheduledAmountSaves]) {
+    cancelAmountSave(input);
+    job.commit();
+  }
+}
+// iOS can suspend a tab while its keyboard or slider is still active.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") flushAmountSaves();
+});
+window.addEventListener("pagehide", flushAmountSaves);
 function parseAmount(value, allowEmpty=false) {
   const text = String(value).trim().replace(",", ".");
   if (!text) return allowEmpty ? 0 : null;
@@ -183,8 +208,17 @@ function attachAmountSlider(control) {
     if (exact.classList.contains("food-input")) renderTotals();
     else renderFoodPreview();
   }
+  function saveDraft() {
+    if (exact.readOnly || exact.disabled || slider.disabled) return;
+    const amount = parseAmount(exact.value);
+    if (amount === null) return;
+    // Save without rewriting an in-progress decimal such as "12.".
+    committed = amount;
+    saveInput(exact);
+  }
   function commit() {
-    if (exact.readOnly || slider.disabled) return;
+    cancelAmountSave(exact);
+    if (exact.readOnly || exact.disabled || slider.disabled) return;
     const amount = parseAmount(exact.value, true);
     if (amount === null) {
       exact.setCustomValidity("Enter a number that is zero or greater.");
@@ -203,14 +237,19 @@ function attachAmountSlider(control) {
     if (parseAmount(exact.value) !== null) {
       sync();
       notify();
+      scheduleAmountSave(exact, saveDraft);
+    } else {
+      cancelAmountSave(exact);
     }
   });
   exact.addEventListener("change", commit);
+  exact.addEventListener("blur", commit);
   exact.addEventListener("keydown", event => {
     if (event.key === "Enter") {
       event.preventDefault();
       exact.blur();
     } else if (event.key === "Escape") {
+      cancelAmountSave(exact);
       exact.value = String(committed);
       exact.setCustomValidity("");
       sync();
@@ -225,8 +264,12 @@ function attachAmountSlider(control) {
     exact.setCustomValidity("");
     sync();
     notify();
+    scheduleAmountSave(exact, saveDraft);
   });
   slider.addEventListener("change", commit);
+  slider.addEventListener("pointerup", commit);
+  slider.addEventListener("touchend", commit, {passive:true});
+  slider.addEventListener("blur", commit);
   slider.addEventListener("keydown", event => {
     const direction = {ArrowLeft:-1, ArrowDown:-1, ArrowRight:1, ArrowUp:1}[event.key];
     if (!direction || slider.disabled) return;
@@ -240,6 +283,7 @@ function attachAmountSlider(control) {
   amountControls.set(exact, {sync, slider});
 }
 const saveChains = new WeakMap();
+const submittedAmounts = new WeakMap();
 const saveErrors = new Set();
 let pendingSaves = 0;
 function showSaveStatus() {
@@ -250,6 +294,11 @@ function showSaveStatus() {
 function saveInput(el) {
   if (DAY_LOCKED || dayLockChanging) return Promise.resolve();
   const amount = n(el.dataset.amount);
+  // Input, release and blur can all describe the same edit on a phone.
+  if (submittedAmounts.get(el) === amount && !saveErrors.has(el)) {
+    return saveChains.get(el) || Promise.resolve();
+  }
+  submittedAmounts.set(el, amount);
   pendingSaves++;
   showSaveStatus();
   // Serialize releases for the same food so an older request cannot win.
@@ -258,6 +307,7 @@ function saveInput(el) {
     try {
       const res = await fetch("/api/entry", {
         method:"POST",
+        keepalive:true,
         headers:{"Content-Type":"application/json"},
         body:JSON.stringify({day:DAY, food_name:el.dataset.name, amount})
       });
@@ -293,15 +343,21 @@ function adjacentDay(isoDay, offset) {
   return /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(next) &&
     next >= "0001-01-01" && next <= "9999-12-31" ? next : null;
 }
+async function openDay(next) {
+  flushAmountSaves();
+  await Promise.allSettled(inputs.map(input => saveChains.get(input)).filter(Boolean));
+  if (saveErrors.size) return;
+  window.location.href = "/?day=" + encodeURIComponent(next);
+}
 function navigateDay(offset) {
-  const next = adjacentDay(document.getElementById("dayPicker").value || DAY, offset);
-  if (next) window.location.href = "/?day=" + encodeURIComponent(next);
+  const next = adjacentDay(DAY, offset);
+  if (next) openDay(next);
 }
 document.getElementById("previousDay").addEventListener("click", () => navigateDay(-1));
 document.getElementById("nextDay").addEventListener("click", () => navigateDay(1));
 
 document.getElementById("dayPicker").addEventListener("change", (e) => {
-  if (e.target.value) window.location.href = "/?day="+encodeURIComponent(e.target.value);
+  if (e.target.value) openDay(e.target.value);
 });
 document.getElementById("healthButton").addEventListener("click", () => {
   const t = computeTotals();
@@ -897,6 +953,7 @@ dayLockButton.addEventListener("click", async () => {
     dayLockNotice.textContent = "Wait for the current food save to finish, then lock the day.";
     return;
   }
+  flushAmountSaves();
   dayLockChanging = true;
   dayLockButton.disabled = true;
   dayLockButton.textContent = DAY_LOCKED ? "Unlocking..." : "Locking...";
