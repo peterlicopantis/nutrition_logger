@@ -57,7 +57,7 @@ class CategoryHistoryTests(unittest.TestCase):
         self.assertEqual(melb.salt_spins_for(current["foods"],{"Original":58},[])["grams"],0)
         self.client.post("/foods/move",data={"name":"Original","category":"Dawg Bowl"})
         self.assertEqual(melb.load_foods()["Original"]["category"],"Dawg Bowl")
-        self.assertEqual(melb.salt_spins_for(melb.load_foods(),{"Original":58},[])["spins"],2)
+        self.assertEqual(melb.salt_spins_for(melb.load_foods(),{"Original":58},[])["spins"],2.4)
 
     def test_new_food_can_create_category_and_moving_can_create_category(self):
         payload={"name":"New food","category":"Dawg Bowl","new_category":"Breakfast",
@@ -82,7 +82,7 @@ class CategoryHistoryTests(unittest.TestCase):
         self.assertEqual(after,before)
         self.assertEqual(melb.day_totals_for("2026-10-06"),totals)
         self.assertEqual(melb.salt_spins_for(after["foods"],{"Original":58},[],after["salt_category"]),salt)
-        self.assertEqual(salt["spins"],5)
+        self.assertEqual(salt["spins"],6.1)
         self.assertEqual(melb.load_foods()["Original"]["category"],"Dawg Bowl")
         self.assertEqual(melb.load_foods()["Original"]["salt_extra_weight_factor"],0)
 

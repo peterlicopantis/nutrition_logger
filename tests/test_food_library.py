@@ -181,7 +181,7 @@ class FoodLibraryTests(unittest.TestCase):
             self.assertEqual(after[key],before[key])
         result=melb.salt_spins_for(melb.load_foods(),{"Regular food":29},[])
         self.assertEqual(result["grams"],87)
-        self.assertEqual(result["spins"],3)
+        self.assertEqual(result["spins"],3.7)
         self.assertEqual(self.client.get("/foods/export").json["foods"]["Regular food"]["salt_extra_weight_factor"],2)
         self.assertIn("3.0&times; salt weight",response.get_data(as_text=True))
         self.assertIn("3.0&times; salt weight",self.client.get("/?day=2026-10-07").get_data(as_text=True))

@@ -201,8 +201,10 @@ unknown. Data is attributed to Open Food Facts under
 
 ## Salt shaker spins
 
-The dashboard estimates spins as Meal-category grams plus the mass of checked
-daily logged foods, divided by 29 (one decimal place). Other permanent categories
+The dashboard estimates spins as Dawg Bowl grams (including configured extra
+salt weight) plus the mass of checked daily logged foods, divided by 23.75
+(one decimal place). This is calibrated from 1,900 g needing 80 spins. Locked
+days retain their saved calibration; older locked days keep the original 29 g/spin. Other permanent categories
 do not contribute. Temporary foods start unchecked; use Include in spins after
 logging them. Their mass is grams per serving times servings eaten, counted once.
 
@@ -328,3 +330,21 @@ from Git along with the starter-library change. The files remain on disk.
 Older branches that still track these filenames can overwrite ignored local
 files during checkout; back up your library and bring this change into those
 branches before switching to them.
+
+Food lookup uses Open Food Facts' Search-a-licious API for packaged-food names,
+with automatic transient retries and a legacy-search fallback within one shared
+20-second budget. One click starts the complete search; repeated clicks do not
+start duplicates. A delayed search shows that it is still working. Plain-food
+reference searches remain offline. Search-index results without a label serving
+use an explicit 100 g or 100 ml reference; no package size or item weight is
+assumed. A service-outage message describes a provider problem, not a misspelling.
+API reference: https://search.openfoodfacts.org/openapi.json
+
+The salt calculator also estimates **salt dispensed** and **sodium from that salt**
+using your measured shaker output: **60 spins = 4.5 g salt = 1,769 mg sodium**.
+That is 0.075 g salt and 1,769/60 mg sodium per spin. Estimates use the underlying
+spin calculation before display rounding and update as food amounts change.
+For example, 1,900 g salt weight calls for 80 spins, approximately 6.00 g salt and
+2,359 mg sodium. These figures describe added shaker salt only. They do not
+change food macros or Apple Health exports. Newly locked days retain these
+dispensing rates; older locked days use this first measured output as a baseline.

@@ -233,7 +233,7 @@ class LookupTests(unittest.TestCase):
         self.assertIsNone(result)
 
     def test_barcode_lookup_and_cached_description_quantities(self):
-        body = json.dumps({"products": [label_product(product_name="Rice Krispies Treats Original")]}).encode()
+        body = json.dumps({"hits": [label_product(product_name="Rice Krispies Treats Original")]}).encode()
         with patch.object(food_lookup, "urlopen", return_value=io.BytesIO(body)) as opened:
             first = food_lookup.lookup_foods("I had 2 rice krispy treats")
             second = food_lookup.lookup_foods("I had a rice krispy treat")
@@ -304,7 +304,7 @@ class ImprovedLookupTests(unittest.TestCase):
         self.assertEqual(cooked[0]["serving_g"], 46)
         for query in ("carrot cake", "carrot juice"):
             with self.subTest(query=query):
-                with patch.object(food_lookup, "urlopen", return_value=io.BytesIO(b'{"products":[]}')) as opened:
+                with patch.object(food_lookup, "urlopen", return_value=io.BytesIO(b'{"hits":[]}')) as opened:
                     result = food_lookup.lookup_foods(query)
                 self.assertEqual(result["products"], [])
                 opened.assert_called_once()
@@ -315,14 +315,14 @@ class ImprovedLookupTests(unittest.TestCase):
             label_product(code="0038000000003", product_name="Mega Snack Chocolate"),
             label_product(code="0038000000004", product_name="Mega Snack"),
         ]
-        with patch.object(food_lookup, "urlopen", return_value=io.BytesIO(json.dumps({"products": products}).encode())):
+        with patch.object(food_lookup, "urlopen", return_value=io.BytesIO(json.dumps({"hits": products}).encode())):
             result = food_lookup.lookup_foods("mega snack")
         self.assertEqual([item["name"] for item in result["products"]], ["Mega Snack", "Mega Snack Chocolate"])
 
     def test_transient_database_failure_retries_once(self):
         from urllib.error import HTTPError
         error = HTTPError("https://example.invalid", 503, "Busy", {}, None)
-        response = io.BytesIO(json.dumps({"products":[label_product(product_name="Mega Snack")]}).encode())
+        response = io.BytesIO(json.dumps({"hits":[label_product(product_name="Mega Snack")]}).encode())
         with patch.object(food_lookup, "urlopen", side_effect=[error, response]) as opened:
             with patch.object(food_lookup.time, "sleep"):
                 result = food_lookup.lookup_foods("mega snack")
@@ -332,14 +332,14 @@ class ImprovedLookupTests(unittest.TestCase):
         with patch.object(food_lookup, "urlopen", side_effect=AssertionError("Successful results must be cached")):
             self.assertEqual(food_lookup.lookup_foods("Mega Snack")["products"], result["products"])
 
-    def test_two_timeouts_stop_and_allow_a_later_retry(self):
+    def test_failed_services_stop_and_allow_a_later_retry(self):
         with patch.object(food_lookup, "urlopen", side_effect=TimeoutError("Timeout")) as opened:
             with patch.object(food_lookup.time, "sleep"):
                 with self.assertRaises(food_lookup.FoodLookupError):
                     food_lookup.lookup_foods("mega snack")
-        self.assertEqual(opened.call_count, 2)
+        self.assertEqual(opened.call_count, 4)
         self.assertEqual(food_lookup._inflight, {})
-        body = json.dumps({"products":[label_product(product_name="Mega Snack")]}).encode()
+        body = json.dumps({"hits":[label_product(product_name="Mega Snack")]}).encode()
         with patch.object(food_lookup, "urlopen", return_value=io.BytesIO(body)):
             self.assertTrue(food_lookup.lookup_foods("mega snack")["products"])
 
@@ -350,13 +350,13 @@ class ImprovedLookupTests(unittest.TestCase):
         started = threading.Event()
         release = threading.Event()
         def respond(request, timeout):
-            query = parse_qs(urlparse(request.full_url).query)["search_terms"][0]
+            query = parse_qs(urlparse(request.full_url).query)["q"][0]
             if query == "alpha snack":
                 started.set()
                 if not release.wait(5):
                     raise TimeoutError("Test did not release search")
             name = "Alpha Snack" if query == "alpha snack" else "Beta Snack"
-            return io.BytesIO(json.dumps({"products":[label_product(product_name=name)]}).encode())
+            return io.BytesIO(json.dumps({"hits":[label_product(product_name=name)]}).encode())
         with patch.object(food_lookup, "urlopen", side_effect=respond):
             with ThreadPoolExecutor(max_workers=2) as pool:
                 slow = pool.submit(food_lookup.lookup_foods, "alpha snack")
@@ -376,17 +376,17 @@ class ImprovedLookupTests(unittest.TestCase):
                 self.setUp()
                 def failure():
                     return IncompleteRead(b"partial", 100) if error_type is IncompleteRead else RemoteDisconnected("Disconnected")
-                body = json.dumps({"products":[label_product(product_name="Mega Snack")]}).encode()
+                body = json.dumps({"hits":[label_product(product_name="Mega Snack")]}).encode()
                 with patch.object(food_lookup, "urlopen", side_effect=[failure(), io.BytesIO(body)]) as opened:
                     with patch.object(food_lookup.time, "sleep"):
                         self.assertTrue(food_lookup.lookup_foods("mega snack")["products"])
                 self.assertEqual(opened.call_count, 2)
                 self.setUp()
-                with patch.object(food_lookup, "urlopen", side_effect=[failure(), failure()]) as opened:
+                with patch.object(food_lookup, "urlopen", side_effect=[failure(), failure(), failure(), failure()]) as opened:
                     with patch.object(food_lookup.time, "sleep"):
                         with self.assertRaises(food_lookup.FoodLookupError):
                             food_lookup.lookup_foods("mega snack")
-                self.assertEqual(opened.call_count, 2)
+                self.assertEqual(opened.call_count, 4)
                 self.assertEqual(food_lookup._inflight, {})
 
 
@@ -520,15 +520,15 @@ class SaltSpinTests(unittest.TestCase):
         amounts={"Meal":290, "Cream":500, "Test":600, "Cal":900}
         entries=[{"serving_g":61,"servings":2,"include_in_spins":True},
                  {"serving_g":100,"servings":4,"include_in_spins":False}]
-        self.assertEqual(melb.salt_spins_for(foods,amounts,entries),{"grams":412,"spins":14.2,"rice_bonus":0})
+        self.assertEqual(melb.salt_spins_for(foods,amounts,entries),{"grams":412,"spins":17.3,"rice_bonus":0})
         self.assertEqual(melb.salt_spins_for({}, {}, []),{"grams":0,"spins":0,"rice_bonus":0})
 
     def test_rice_adds_extra_one_and_a_half_times_mass_only_for_spins(self):
         foods={"Enriched Rice":{"category":"Dawg Bowl"}, "Carrot":{"category":"Dawg Bowl"}}
         result=melb.salt_spins_for(foods,{"Enriched Rice":200,"Carrot":58},[])
-        self.assertEqual(result,{"grams":558,"spins":19.2,"rice_bonus":300})
+        self.assertEqual(result,{"grams":558,"spins":23.5,"rice_bonus":300})
         rice={"name":"Rice, white, cooked", "serving_g":100,"servings":2,"include_in_spins":True}
-        self.assertEqual(melb.salt_spins_for({}, {}, [rice]),{"grams":500,"spins":17.2,"rice_bonus":300})
+        self.assertEqual(melb.salt_spins_for({}, {}, [rice]),{"grams":500,"spins":21.1,"rice_bonus":300})
         rice["include_in_spins"]=False
         self.assertEqual(melb.salt_spins_for({}, {}, [rice])["grams"],0)
         self.assertFalse(melb.is_rice_for_spins("Rice Krispies Treats"))

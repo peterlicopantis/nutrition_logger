@@ -26,6 +26,9 @@ DEFAULT_FOODS_PATH = BASE_DIR / "foods.default.json"
 DB_PATH = BASE_DIR / "melb.db"
 CONFIG_PATH = BASE_DIR / "config.json"
 SALT_CATEGORY = PERMANENT_CATEGORY
+SALT_GRAMS_PER_SPIN = 1900 / 80  # Measured shaker calibration: 23.75 g per spin.
+SHAKER_SALT_G_PER_SPIN = 4.5 / 60
+SHAKER_SODIUM_MG_PER_SPIN = 1769 / 60
 CATEGORIES = [SALT_CATEGORY]
 
 app = Flask(__name__)
@@ -434,7 +437,9 @@ def is_rice_for_spins(name: str) -> bool:
 app.jinja_env.globals["is_rice_for_spins"] = is_rice_for_spins
 app.jinja_env.globals["salt_extra_factor"] = extra_factor
 
-def salt_spins_for(foods: dict, amounts: dict, entries: list[dict], salt_category: str = SALT_CATEGORY) -> dict:
+def salt_spins_for(foods: dict, amounts: dict, entries: list[dict],
+                   salt_category: str = SALT_CATEGORY,
+                   grams_per_spin: float = SALT_GRAMS_PER_SPIN) -> dict:
     grams = 0.0
     rice_bonus = 0.0
     for name, meta in foods.items():
@@ -450,8 +455,16 @@ def salt_spins_for(foods: dict, amounts: dict, entries: list[dict], salt_categor
         grams += mass
         rice_bonus += mass * extra_factor(entry.get("name", ""), entry)
     grams += rice_bonus
-    return {"grams": round(grams, 3), "spins": round(grams / 29, 1),
+    return {"grams": round(grams, 3), "spins": round(grams / grams_per_spin, 1),
             "rice_bonus": round(rice_bonus, 3)}
+
+
+def shaker_output_for(spins: float, calibration: dict) -> dict:
+    """Estimate this shaker's output from measured dispensing, before rounding."""
+    return {
+        "salt_g": round(spins * calibration["salt_g_per_spin"], 2),
+        "sodium_mg": math.floor(spins * calibration["sodium_mg_per_spin"] + 0.5),
+    }
 
 
 def day_food_response(day: str, **extra):
@@ -636,6 +649,22 @@ def dashboard():
                if items or category == PERMANENT_CATEGORY}
 
     day_foods = load_day_foods(day)
+    locked_snapshot = locked_day_snapshot(day)
+    # Older locked snapshots predate calibration storage and used 29 g/spin.
+    grams_per_spin = (locked_snapshot.get("salt_grams_per_spin", 29)
+                      if locked_snapshot is not None else SALT_GRAMS_PER_SPIN)
+    # Before output estimates existed, locked days had no dispensing rates.
+    # Apply this first measurement as their baseline without rewriting logs.
+    shaker_calibration = (
+        locked_snapshot.get("shaker_calibration", {
+            "salt_g_per_spin": 4.5 / 60, "sodium_mg_per_spin": 1769 / 60})
+        if locked_snapshot is not None else {
+            "salt_g_per_spin": SHAKER_SALT_G_PER_SPIN,
+            "sodium_mg_per_spin": SHAKER_SODIUM_MG_PER_SPIN})
+    salt_summary = salt_spins_for(foods, amounts, day_foods,
+                                 library_state["salt_category"], grams_per_spin)
+    # Displayed spins have one decimal; derive output from the underlying mass.
+    shaker_output = shaker_output_for(salt_summary["grams"] / grams_per_spin, shaker_calibration)
     totals = combined_totals(foods, amounts, day_foods)
     snapshot = latest_health_snapshot(day)
     balance = None
@@ -648,7 +677,10 @@ def dashboard():
     return render_template(
         "dashboard.html",
         day=day,
-        salt_spins=salt_spins_for(foods, amounts, day_foods, library_state["salt_category"]),
+        salt_spins=salt_summary,
+        salt_grams_per_spin=grams_per_spin,
+        shaker_output=shaker_output,
+        shaker_calibration=shaker_calibration,
         salt_category=library_state["salt_category"],
         historical_library=library_state["historical"],
         day_locked=locked_day_snapshot(day) is not None,
@@ -681,7 +713,11 @@ def api_day_lock():
             library = library_state_for_day(day)
             snapshot = {"library": library, "amounts": load_amounts(day),
                         "day_foods": load_day_foods(day),
-                        "health_snapshot": latest_health_snapshot(day)}
+                        "health_snapshot": latest_health_snapshot(day),
+                        "salt_grams_per_spin": SALT_GRAMS_PER_SPIN,
+                        "shaker_calibration": {
+                            "salt_g_per_spin": SHAKER_SALT_G_PER_SPIN,
+                            "sodium_mg_per_spin": SHAKER_SODIUM_MG_PER_SPIN}}
             with db() as conn:
                 conn.execute("INSERT INTO day_locks(day, snapshot_json, locked_at) VALUES (?, ?, ?)",
                              (day, json.dumps(snapshot, allow_nan=False),

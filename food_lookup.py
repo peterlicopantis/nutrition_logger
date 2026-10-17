@@ -5,8 +5,10 @@ https://openfoodfacts.github.io/documentation/docs/Product-Opener/api/
 https://openfoodfacts.github.io/documentation/docs/Product-Opener/schemas/schemas/product_nutrition/
 https://openfoodfacts.github.io/documentation/docs/Product-Opener/schemas/schemas/product_nutrition_v3.5/
 
-Full-text search still uses the documented legacy CGI endpoint; barcode reads
-use API v3.6. Results are candidates for the user to check against their package.
+Full-text search uses Search-a-licious with a legacy CGI fallback; barcode reads
+use API v3.6. Search API schema: https://search.openfoodfacts.org/openapi.json
+Search documentation: https://openfoodfacts.github.io/search-a-licious/
+Results are candidates for the user to check against their package.
 Set MELB_FOOD_LOOKUP_STAGING=1 for live development requests to the OFF staging
 server. Automated tests should mock urlopen instead of contacting either server.
 """
@@ -54,6 +56,10 @@ with Path(__file__).with_name("generic_foods.json").open(encoding="utf-8") as ca
 
 class FoodLookupError(Exception):
     """A food lookup could not be completed; the message is safe to display."""
+
+    def __init__(self, message: str, *, retryable: bool = False):
+        super().__init__(message)
+        self.retryable = retryable
 
 
 class _PendingLookup:
@@ -342,8 +348,8 @@ def _reserve_request(*, barcode: bool) -> None:
         timestamps.append(now)
 
 
-def _request_json(url: str, *, barcode: bool) -> dict:
-    deadline = time.monotonic() + REQUEST_BUDGET
+def _request_json(url: str, *, barcode: bool, deadline: float | None = None) -> dict:
+    deadline = deadline if deadline is not None else time.monotonic() + REQUEST_BUDGET
     headers = {"User-Agent": USER_AGENT, "Accept": "application/json"}
     if os.environ.get("MELB_FOOD_LOOKUP_STAGING", "").lower() in ("1", "true", "yes"):
         headers["Authorization"] = "Basic " + base64.b64encode(b"off:off").decode("ascii")
@@ -367,10 +373,12 @@ def _request_json(url: str, *, barcode: bool) -> dict:
             return data
         except HTTPError as error:
             if error.code == 404 and barcode:
+                error.close()
                 return {"products": []}
             if error.code == 429:
+                error.close()
                 raise FoodLookupError("The food database is busy. Wait a minute or enter the label manually.") from error
-            transient = error.code in (502, 503, 504)
+            transient = error.code in (408, 500, 502, 503, 504)
             last_error = error
             error.close()
         except (URLError, OSError, HTTPException) as error:
@@ -383,29 +391,95 @@ def _request_json(url: str, *, barcode: bool) -> dict:
         if not transient or attempt == 1 or deadline - time.monotonic() <= RETRY_DELAY:
             break
         time.sleep(RETRY_DELAY)
-    raise FoodLookupError("Couldn't reach the packaged-food database after trying automatically. You can still enter the label manually or search a plain food such as carrot.") from last_error
+    raise FoodLookupError("The packaged-food database is temporarily unavailable. This is a connection/service problem, not a spelling error. Plain foods such as carrot still work, or you can enter the label manually.", retryable=True) from last_error
+
+
+def _normalize_search_hit(hit: dict) -> dict | None:
+    """Adapt search-index fields without inventing an item or serving weight."""
+    if not isinstance(hit, dict):
+        return None
+    item = copy.deepcopy(hit)
+    if isinstance(item.get("brands"), list):
+        item["brands"] = ", ".join(value for value in item["brands"] if isinstance(value, str))
+    # The index often omits label servings. Its *_100g fields describe 100 ml
+    # for liquids, so keep those separate from edible mass and salt grams.
+    quantity = _text(item.get("quantity"))
+    volume_quantity = bool(re.search(r"\b(?:ml|cl|litres?|liters?|l|fl\s*oz)\b", quantity, re.I))
+    mass_quantity = bool(re.search(r"\b(?:mg|kg|g|grams?|oz|lbs?)\b", quantity, re.I)) and not volume_quantity
+    volume = (item.get("product_quantity_unit") == "ml" or
+              item.get("serving_quantity_unit") == "ml" or
+              volume_quantity or
+              (not mass_quantity and "en:beverages" in (item.get("categories_tags") or [])))
+    nutrition = item.get("nutrition")
+    aggregate = nutrition.get("aggregated_set") if isinstance(nutrition, dict) else None
+    if isinstance(aggregate, dict):
+        if aggregate.get("per") == "100ml" and not _number(item.get("serving_quantity")):
+            item.update(serving_size="100 ml", serving_quantity=100, serving_quantity_unit="ml")
+        return normalize_product(item)
+    if volume and _serving_grams(item) is None:
+        # Prefer a real per-serving label when present. Otherwise explicitly
+        # offer a volume reference, never an assumed can/bottle or 100 g.
+        nutriments = item.get("nutriments")
+        if isinstance(nutriments, dict) and _legacy_macros(nutriments, "serving") is None:
+            macros = _legacy_macros(nutriments, "100g")
+            if macros:
+                # Reuse the normal validation and source-link construction.
+                item["nutriments"] = {**{key: value for key, value in nutriments.items()
+                                          if not key.endswith("_serving")}, **{
+                    ({"protein": "proteins", "calories": "energy-kcal",
+                      "carbs": "carbohydrates"}.get(key, key) + "_serving"): value
+                    for key, value in macros.items() if value is not None}}
+                item["serving_size"] = "100 ml"
+                item["serving_quantity"] = 100
+                item["serving_quantity_unit"] = "ml"
+    return normalize_product(item)
 
 
 def _fetch_products(query: str, *, barcode: bool, staging: bool) -> list[dict]:
     base_url = "https://world.openfoodfacts.net" if staging else "https://world.openfoodfacts.org"
+    deadline = time.monotonic() + REQUEST_BUDGET
+    legacy_url = base_url + "/cgi/search.pl?" + urlencode({
+        "search_terms": query, "search_simple": 1, "action": "process",
+        "json": 1, "page_size": 24, "fields": PRODUCT_FIELDS,
+        "lc": "en", "cc": "us",
+    })
+    search_index = False
     if barcode:
         url = f"{base_url}/api/v3.6/product/{query}?" + urlencode({
             "fields": PRODUCT_FIELDS, "lc": "en", "cc": "us",
         })
+        data = _request_json(url, barcode=True, deadline=deadline)
+    elif staging:
+        # Development searches stay entirely on the staging server.
+        data = _request_json(legacy_url, barcode=False, deadline=deadline)
     else:
-        url = f"{base_url}/cgi/search.pl?" + urlencode({
-            "search_terms": query, "search_simple": 1, "action": "process",
-            "json": 1, "page_size": 24, "fields": PRODUCT_FIELDS,
-            "lc": "en", "cc": "us",
+        url = "https://search.openfoodfacts.org/search?" + urlencode({
+            # Treat user text as words, rather than executable Lucene syntax.
+            "q": " ".join(re.findall(r"[^\W_]+", query, flags=re.UNICODE)).lower(),
+            "page_size": 24, "langs": "en",
+            "fields": PRODUCT_FIELDS + ",quantity,categories_tags",
         })
-    data = _request_json(url, barcode=barcode)
-    raw_products = [data["product"]] if barcode and isinstance(data.get("product"), dict) else data.get("products", [])
+        try:
+            data = _request_json(url, barcode=False, deadline=deadline)
+            if data.get("timed_out"):
+                raise FoodLookupError("The search service timed out.", retryable=True)
+            if not isinstance(data.get("hits"), list):
+                raise FoodLookupError("The search service returned an unexpected result.", retryable=True)
+            search_index = True
+        except FoodLookupError as error:
+            # A second endpoint can help a provider outage, but cannot extend
+            # the shared time budget or bypass rate limiting.
+            if not error.retryable or deadline - time.monotonic() < 1:
+                raise
+            data = _request_json(legacy_url, barcode=False, deadline=deadline)
+    raw_products = ([data["product"]] if barcode and isinstance(data.get("product"), dict)
+                    else data.get("hits" if search_index else "products", []))
     if not isinstance(raw_products, list):
         raise FoodLookupError("The food database returned an unexpected result. Try again later.")
     matches = []
     seen = set()
     for index, item in enumerate(raw_products):
-        product = normalize_product(item)
+        product = _normalize_search_hit(item) if search_index else normalize_product(item)
         if not product or product["barcode"] in seen:
             continue
         score = () if barcode else _match_score(query, product, item)

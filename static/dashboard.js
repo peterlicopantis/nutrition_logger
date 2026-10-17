@@ -3,6 +3,8 @@ const DAY = dashboardConfig.day;
 const DAY_LOCKED = Boolean(dashboardConfig.dayLocked);
 let dayLockChanging = false;
 const SALT_CATEGORY = dashboardConfig.saltCategory || "Dawg Bowl";
+const SALT_GRAMS_PER_SPIN = dashboardConfig.saltGramsPerSpin;
+const SHAKER_CALIBRATION = dashboardConfig.shakerCalibration;
 const desktopLayout = window.matchMedia("(min-width:1024px)");
 const phoneLayout = window.matchMedia("(max-width:600px), (max-width:900px) and (pointer:coarse)");
 const compactPanels = [document.getElementById("dayFoodPanel"), document.getElementById("healthPanel")].filter(Boolean);
@@ -127,13 +129,18 @@ function computeSaltSpins() {
     }
   }
   grams += riceBonus;
-  return {grams, spins:grams / 29, riceBonus};
+  const spins = grams / SALT_GRAMS_PER_SPIN;
+  return {grams, spins, riceBonus,
+    saltDispensed:spins * SHAKER_CALIBRATION.salt_g_per_spin,
+    sodiumMg:spins * SHAKER_CALIBRATION.sodium_mg_per_spin};
 }
 function renderSaltSpins() {
   const result = computeSaltSpins();
   document.getElementById("saltSpins").textContent = rounded(result.spins, 1);
   document.getElementById("saltMealGrams").textContent = rounded(result.grams, 1);
   document.getElementById("saltRiceBonus").textContent = rounded(result.riceBonus, 1);
+  document.getElementById("saltDispensed").textContent = rounded(result.saltDispensed, 2).toFixed(2);
+  document.getElementById("saltSodium").textContent = Math.round(result.sodiumMg).toLocaleString("en-US");
 }
 
 function renderTotals() {
@@ -401,6 +408,7 @@ let savingFood = false;
 let lookupGeneration = 0;
 let lookupController = null;
 let lookupPendingQuery = "";
+let lookupProgressTimer = null;
 let lookupInputValue = foodQuery.value;
 const LOOKUP_TIMEOUT_MS = 25000;
 const removingFoods = new Set();
@@ -691,6 +699,8 @@ async function requestJson(url, options={}) {
 }
 function invalidateLookup() {
   lookupGeneration++;
+  clearTimeout(lookupProgressTimer);
+  lookupProgressTimer = null;
   lookupController?.abort();
   lookupController = null;
   lookupPendingQuery = "";
@@ -698,6 +708,7 @@ function invalidateLookup() {
   lookupStatus.textContent = "";
   lookupStatus.classList.remove("food-error");
   lookupButton.disabled = false;
+  lookupForm.setAttribute("aria-busy", "false");
   lookupButton.textContent = "Look up food";
 }
 function handleQueryEdit() {
@@ -733,6 +744,12 @@ lookupForm.addEventListener("submit", async event => {
   lookupButton.disabled = true;
   lookupButton.textContent = "Looking up...";
   lookupStatus.textContent = "Looking up matching foods...";
+  lookupForm.setAttribute("aria-busy", "true");
+  lookupProgressTimer = setTimeout(() => {
+    if (generation === lookupGeneration) {
+      lookupStatus.textContent = "The food database is taking longer. Still searching automatically; you do not need to click again.";
+    }
+  }, 4000);
   const currentSearch = () => generation === lookupGeneration && foodQuery.value.trim() === query && !document.getElementById("lookupArea").hidden;
   try {
     const data = await requestJson("/api/food-lookup?q="+encodeURIComponent(query), {signal:controller.signal});
@@ -754,6 +771,9 @@ lookupForm.addEventListener("submit", async event => {
   } finally {
     clearTimeout(timeout);
     if (generation === lookupGeneration) {
+      clearTimeout(lookupProgressTimer);
+      lookupProgressTimer = null;
+      lookupForm.setAttribute("aria-busy", "false");
       lookupController = null;
       lookupPendingQuery = "";
       lookupButton.disabled = false;
