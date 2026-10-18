@@ -43,6 +43,7 @@
     <span class="small"><span id="saltMealGrams">{{ salt_summary.grams }}</span> g salt weight &middot; 1 spin / {{ salt_grams_per_spin }} g</span>
     <span class="small">Extra salt weight: +<span id="saltRiceBonus">{{ salt_summary.rice_bonus|default(0) }}</span> g</span>
   </div>
+  <button class="btn" id="seasoningToggle" type="button" aria-expanded="false" aria-controls="seasoningPanel">Seasoning calculator</button>
   <button class="btn" id="dayLockButton" type="button" aria-pressed="{{ 'true' if day_locked else 'false' }}">{{ 'Unlock day' if day_locked else 'Lock day' }}</button>
   <button class="btn primary" id="healthButton" type="button">Send totals to Apple Health</button>
   <form method="post" action="/reset" onsubmit="return confirm('Clear every entry for this date?')">
@@ -50,6 +51,14 @@
     <button id="resetDayButton" class="btn danger" type="submit">Reset day</button>
   </form>
 </div>
+  <section class="seasoning-calculator" id="seasoningPanel" aria-label="Seasoning sodium calculator" hidden>
+    <p class="small seasoning-help">Match the shaker's sodium estimate using your seasoning's nutrition label.</p>
+    <div class="seasoning-fields">
+      <label for="seasoningServing"><span>Serving size (g)</span><input id="seasoningServing" type="number" inputmode="decimal" min="0" step="any" value="1"></label>
+      <label for="seasoningSodium"><span>Sodium per serving (mg)</span><input id="seasoningSodium" type="number" inputmode="decimal" min="0" step="any" placeholder="e.g. 241"></label>
+    </div>
+    <p class="seasoning-result" id="seasoningResult" role="status" aria-live="polite">Enter your seasoning's sodium per serving.</p>
+  </section>
 <p id="dayLockNotice" class="small day-lock-notice" role="status"{% if not day_locked %} hidden{% endif %}>Day locked. Food entries, library settings and totals are frozen. Unlock to make changes.</p>
 <div class="small health-export-note">
   Apple Health logging is intended for one final export of the day. Re-running the Shortcut can create duplicate Health samples.
@@ -212,5 +221,5 @@
   "dayFoods": day_foods|default([], true),
   "dayFoodTotals": day_food_totals|default({}, true)
 }|tojson }}'></div>
-<script src="{{ url_for('static', filename='dashboard.js', v='shaker-output-1') }}"></script>
+<script src="{{ url_for('static', filename='dashboard.js', v='seasoning-calculator-1') }}"></script>
 {% endblock %}

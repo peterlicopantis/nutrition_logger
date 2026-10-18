@@ -141,6 +141,31 @@ function renderSaltSpins() {
   document.getElementById("saltRiceBonus").textContent = rounded(result.riceBonus, 1);
   document.getElementById("saltDispensed").textContent = rounded(result.saltDispensed, 2).toFixed(2);
   document.getElementById("saltSodium").textContent = Math.round(result.sodiumMg).toLocaleString("en-US");
+  renderSeasoningCalculator(result.sodiumMg);
+}
+
+function seasoningGramsFor(targetSodiumMg, servingGrams, sodiumPerServing) {
+  if (![targetSodiumMg, servingGrams, sodiumPerServing].every(Number.isFinite) ||
+      targetSodiumMg < 0 || servingGrams <= 0 || sodiumPerServing <= 0) return null;
+  const grams = targetSodiumMg / sodiumPerServing * servingGrams;
+  return Number.isFinite(grams) ? grams : null;
+}
+function renderSeasoningCalculator(targetSodiumMg=computeSaltSpins().sodiumMg) {
+  const servingText = String(document.getElementById("seasoningServing").value ?? "").trim().replace(",", ".");
+  const sodiumText = String(document.getElementById("seasoningSodium").value ?? "").trim().replace(",", ".");
+  const result = document.getElementById("seasoningResult");
+  if (!servingText || !sodiumText) {
+    result.textContent = "Enter a serving size and sodium per serving to calculate grams.";
+    return;
+  }
+  const grams = seasoningGramsFor(targetSodiumMg, Number(servingText), Number(sodiumText));
+  if (grams === null) {
+    result.textContent = "Serving size and sodium per serving must both be greater than zero.";
+    return;
+  }
+  const amount = grams > 0 && grams < 0.01 ? "<0.01" : rounded(grams, 2).toFixed(2);
+  result.textContent = "Use ~" + amount + " g of seasoning to match ~" +
+    Math.round(targetSodiumMg).toLocaleString("en-US") + " mg sodium.";
 }
 
 function renderTotals() {
@@ -518,7 +543,7 @@ function renderFoodPreview() {
 function portionLabel(portion, estimated=false) {
   const weight = rounded(portion.grams, 3);
   // Packaged labels already include their measured serving, if supplied.
-  return portion.id === "label" ? portion.label : portion.label.slice(0, 85) +
+  return ["label", "reference-100g"].includes(portion.id) ? portion.label : portion.label.slice(0, 85) +
     " (" + (estimated ? "~" : "") + weight + " g)";
 }
 function portionIsValid() {
@@ -597,6 +622,11 @@ function setupPortion(product) {
   if (!portions.length && product.basis === "serving" && product.serving_g > 0) {
     portions.push({id:"label", label:product.serving_label || "1 serving", grams:Number(product.serving_g), countable:false});
   }
+  if (!portions.length && product.basis === "100g") {
+    // A reference amount keeps the returned nutrition visible without
+    // claiming a known item/package serving. The user can change its grams.
+    portions.push({id:"reference-100g", label:"100 g (reference amount)", grams:100, countable:false});
+  }
   portionState = {density:{...density}, portions, grams:null, estimated:false,
     sourceEstimated:Boolean(product.portion_estimated), countable:false};
   portionSelect.replaceChildren();
@@ -616,9 +646,16 @@ function setupPortion(product) {
   document.getElementById("portionNote").textContent = product.kind === "generic" ?
     "Typical edible weights are estimates. Choose a size or enter your measured grams, then set servings eaten." :
     "Start with the label serving or enter your measured grams, then set servings eaten.";
-  if (selected && product.basis === "serving") {
+  if (selected && (product.basis === "serving" || selected.id === "reference-100g")) {
     portionSelect.value = selected.id;
     applyPortion(selected, portionState.sourceEstimated);
+    if (selected.id === "reference-100g") {
+      document.getElementById("portionNote").textContent =
+        "Nutrition starts at the database's 100 g reference. Change grams per serving to the amount you ate, then set servings eaten.";
+      document.getElementById("basisWarning").hidden = false;
+      document.getElementById("basisWarning").textContent =
+        "100 g is a reference amount, not a known item or package serving. Change the grams to match your portion; macros scale automatically.";
+    }
   } else {
     portionSelect.value = "custom";
     fields.servings.value = 1;
@@ -1004,3 +1041,14 @@ dayLockButton.addEventListener("click", async () => {
   }
 });
 applyDayEditingState();
+
+// This is an independent calculator: it does not modify food entries or locks.
+const seasoningToggle = document.getElementById("seasoningToggle");
+const seasoningPanel = document.getElementById("seasoningPanel");
+seasoningToggle.addEventListener("click", () => {
+  seasoningPanel.hidden = !seasoningPanel.hidden;
+  seasoningToggle.setAttribute("aria-expanded", String(!seasoningPanel.hidden));
+  if (!seasoningPanel.hidden) renderSeasoningCalculator();
+});
+["seasoningServing", "seasoningSodium"].forEach(id =>
+  document.getElementById(id).addEventListener("input", () => renderSeasoningCalculator()));

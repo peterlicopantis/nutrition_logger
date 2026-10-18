@@ -348,3 +348,17 @@ For example, 1,900 g salt weight calls for 80 spins, approximately 6.00 g salt a
 2,359 mg sodium. These figures describe added shaker salt only. They do not
 change food macros or Apple Health exports. Newly locked days retain these
 dispensing rates; older locked days use this first measured output as a baseline.
+
+When a food result supplies nutrition per 100 g without a label serving,
+**Use this food** fills the editor with a clearly marked **100 g reference amount**.
+Change grams per serving to your portion and the copied macros scale automatically.
+The reference is not an estimate of one item or the package's serving size.
+Known label servings and sourced plain-food portions still use their supplied weights.
+
+A small **Seasoning calculator** button beside the salt readout opens an optional
+calculator, collapsed by default. Enter the label's serving size in grams and
+sodium in milligrams per serving. It calculates
+`shaker sodium target / sodium per serving * serving grams` and follows changes
+to the main calculator automatically. For a seasoning with 241 mg sodium per
+1 g, the 80-spin recipe's sodium target calls for approximately **9.79 g**.
+This calculator can also be used on locked days and does not modify their entries.
