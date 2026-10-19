@@ -1,0 +1,546 @@
+{
+  "source_notebook": "MELB.ipynb",
+  "notes": "Original literal division values recovered without executing notebook code. Only use a serving when all current nutrient coefficients still match. Original per-nutrient ratios are retained where denominators differ.",
+  "foods": {
+    "Aldi tender": {
+      "grams": 112,
+      "source": "notebook",
+      "original_ratios": {
+        "calories": {
+          "amount": 100,
+          "grams": 112
+        },
+        "protein": {
+          "amount": 23,
+          "grams": 112
+        },
+        "fat": {
+          "amount": 1,
+          "grams": 112
+        }
+      },
+      "calories": 100,
+      "protein": 23,
+      "carbs": 0.0,
+      "fat": 1,
+      "fiber": 0.0
+    },
+    "Aldi thigh": {
+      "grams": 112,
+      "source": "notebook",
+      "original_ratios": {
+        "calories": {
+          "amount": 140,
+          "grams": 112
+        },
+        "protein": {
+          "amount": 19,
+          "grams": 112
+        },
+        "fat": {
+          "amount": 7,
+          "grams": 112
+        }
+      },
+      "calories": 140,
+      "protein": 19,
+      "carbs": 0.0,
+      "fat": 7,
+      "fiber": 0.0
+    },
+    "realgood costco": {
+      "grams": 112,
+      "source": "notebook",
+      "original_ratios": {
+        "calories": {
+          "amount": 120,
+          "grams": 112
+        },
+        "protein": {
+          "amount": 21,
+          "grams": 112
+        },
+        "carbs": {
+          "amount": 4,
+          "grams": 112
+        },
+        "fat": {
+          "amount": 5,
+          "grams": 112
+        }
+      },
+      "calories": 120,
+      "protein": 21,
+      "carbs": 4,
+      "fat": 5,
+      "fiber": 0.0
+    },
+    "Costco chipotle": {
+      "grams": 85,
+      "source": "notebook",
+      "original_ratios": {
+        "calories": {
+          "amount": 100,
+          "grams": 85
+        },
+        "protein": {
+          "amount": 16,
+          "grams": 85
+        },
+        "carbs": {
+          "amount": 3,
+          "grams": 85
+        },
+        "fat": {
+          "amount": 2.5,
+          "grams": 85
+        }
+      },
+      "calories": 100,
+      "protein": 16,
+      "carbs": 3,
+      "fat": 2.5,
+      "fiber": 0.0
+    },
+    "JBareLightlyStrips": {
+      "grams": 93,
+      "source": "notebook",
+      "original_ratios": {
+        "calories": {
+          "amount": 170,
+          "grams": 93
+        },
+        "protein": {
+          "amount": 17,
+          "grams": 93
+        },
+        "carbs": {
+          "amount": 11,
+          "grams": 93
+        },
+        "fat": {
+          "amount": 6,
+          "grams": 93
+        },
+        "fiber": {
+          "amount": 0.5,
+          "grams": 93
+        }
+      },
+      "calories": 170,
+      "protein": 17,
+      "carbs": 11,
+      "fat": 6,
+      "fiber": 0.5
+    },
+    "Aldi salmon": {
+      "grams": 112,
+      "source": "notebook",
+      "original_ratios": {
+        "calories": {
+          "amount": 100,
+          "grams": 112
+        },
+        "protein": {
+          "amount": 20,
+          "grams": 112
+        },
+        "fat": {
+          "amount": 3,
+          "grams": 112
+        }
+      },
+      "calories": 100,
+      "protein": 20,
+      "carbs": 0.0,
+      "fat": 3,
+      "fiber": 0.0
+    },
+    "148Russ potato": {
+      "grams": 148,
+      "source": "notebook",
+      "original_ratios": {
+        "calories": {
+          "amount": 110,
+          "grams": 148
+        },
+        "protein": {
+          "amount": 3,
+          "grams": 148
+        },
+        "carbs": {
+          "amount": 24,
+          "grams": 148
+        },
+        "fiber": {
+          "amount": 2,
+          "grams": 148
+        }
+      },
+      "calories": 110,
+      "protein": 3,
+      "carbs": 24,
+      "fat": 0,
+      "fiber": 2
+    },
+    "Hash browns": {
+      "grams": 85,
+      "source": "notebook",
+      "original_ratios": {
+        "calories": {
+          "amount": 60,
+          "grams": 85
+        },
+        "protein": {
+          "amount": 2,
+          "grams": 85
+        },
+        "carbs": {
+          "amount": 14,
+          "grams": 85
+        },
+        "fiber": {
+          "amount": 2,
+          "grams": 85
+        }
+      },
+      "calories": 60,
+      "protein": 2,
+      "carbs": 14,
+      "fat": 0.0,
+      "fiber": 2
+    },
+    "Enriched Rice": {
+      "grams": 45,
+      "source": "notebook",
+      "original_ratios": {
+        "calories": {
+          "amount": 160,
+          "grams": 45
+        },
+        "protein": {
+          "amount": 3,
+          "grams": 45
+        },
+        "carbs": {
+          "amount": 36,
+          "grams": 45
+        },
+        "fat": {
+          "amount": 0,
+          "grams": 45
+        },
+        "fiber": {
+          "amount": 2.5,
+          "grams": 240
+        }
+      },
+      "calories": 160,
+      "protein": 3,
+      "carbs": 36,
+      "fat": 0,
+      "fiber": 0.46875
+    },
+    "60 spinach": {
+      "grams": 85,
+      "source": "notebook",
+      "original_ratios": {
+        "calories": {
+          "amount": 20,
+          "grams": 85
+        },
+        "protein": {
+          "amount": 2,
+          "grams": 85
+        },
+        "carbs": {
+          "amount": 3,
+          "grams": 85
+        }
+      },
+      "calories": 20,
+      "protein": 2,
+      "carbs": 3,
+      "fat": 0,
+      "fiber": 1.8699999999999999
+    },
+    "1 percent walmart": {
+      "grams": 240,
+      "source": "notebook",
+      "original_ratios": {
+        "calories": {
+          "amount": 110,
+          "grams": 240
+        },
+        "protein": {
+          "amount": 9,
+          "grams": 240
+        },
+        "carbs": {
+          "amount": 13,
+          "grams": 240
+        },
+        "fat": {
+          "amount": 2.5,
+          "grams": 240
+        }
+      },
+      "calories": 110,
+      "protein": 9,
+      "carbs": 13,
+      "fat": 2.5,
+      "fiber": 0.0
+    },
+    "2 percent walmart": {
+      "grams": 240,
+      "source": "notebook",
+      "original_ratios": {
+        "calories": {
+          "amount": 130,
+          "grams": 240
+        },
+        "protein": {
+          "amount": 8,
+          "grams": 240
+        },
+        "carbs": {
+          "amount": 13,
+          "grams": 240
+        },
+        "fat": {
+          "amount": 5,
+          "grams": 240
+        }
+      },
+      "calories": 130,
+      "protein": 8,
+      "carbs": 13,
+      "fat": 5,
+      "fiber": 0.0
+    },
+    "skim walmart": {
+      "grams": 240,
+      "source": "notebook",
+      "original_ratios": {
+        "calories": {
+          "amount": 90,
+          "grams": 240
+        },
+        "protein": {
+          "amount": 9,
+          "grams": 240
+        },
+        "carbs": {
+          "amount": 13,
+          "grams": 240
+        },
+        "fat": {
+          "amount": 0,
+          "grams": 240
+        }
+      },
+      "calories": 90,
+      "protein": 9,
+      "carbs": 13,
+      "fat": 0,
+      "fiber": 0.0
+    },
+    "hersh new": {
+      "grams": 5,
+      "source": "notebook",
+      "original_ratios": {
+        "calories": {
+          "amount": 10,
+          "grams": 5
+        },
+        "protein": {
+          "amount": 1,
+          "grams": 5
+        },
+        "carbs": {
+          "amount": 1,
+          "grams": 5
+        },
+        "fat": {
+          "amount": 0.5,
+          "grams": 5
+        },
+        "fiber": {
+          "amount": 2,
+          "grams": 5
+        }
+      },
+      "calories": 10,
+      "protein": 1,
+      "carbs": 1,
+      "fat": 0.5,
+      "fiber": 2
+    },
+    "strawberries": {
+      "grams": 140,
+      "source": "notebook",
+      "original_ratios": {
+        "calories": {
+          "amount": 50,
+          "grams": 140
+        },
+        "protein": {
+          "amount": 0.5,
+          "grams": 140
+        },
+        "carbs": {
+          "amount": 13,
+          "grams": 140
+        },
+        "fat": {
+          "amount": 0,
+          "grams": 140
+        },
+        "fiber": {
+          "amount": 3,
+          "grams": 140
+        }
+      },
+      "calories": 50,
+      "protein": 0.5,
+      "carbs": 13,
+      "fat": 0,
+      "fiber": 3
+    },
+    "straw+pine": {
+      "grams": 140,
+      "source": "notebook",
+      "original_ratios": {
+        "calories": {
+          "amount": 70,
+          "grams": 140
+        },
+        "protein": {
+          "amount": 0.8,
+          "grams": 140
+        },
+        "carbs": {
+          "amount": 16,
+          "grams": 140
+        },
+        "fat": {
+          "amount": 0,
+          "grams": 140
+        },
+        "fiber": {
+          "amount": 2,
+          "grams": 140
+        }
+      },
+      "calories": 70,
+      "protein": 0.8,
+      "carbs": 16,
+      "fat": 0,
+      "fiber": 2
+    },
+    "Nuts kirk": {
+      "grams": 28,
+      "source": "notebook",
+      "original_ratios": {
+        "calories": {
+          "amount": 180,
+          "grams": 28
+        },
+        "protein": {
+          "amount": 5,
+          "grams": 28
+        },
+        "carbs": {
+          "amount": 6,
+          "grams": 28
+        },
+        "fat": {
+          "amount": 16,
+          "grams": 28
+        }
+      },
+      "calories": 180,
+      "protein": 5,
+      "carbs": 6,
+      "fat": 16,
+      "fiber": 3.5
+    },
+    "Aldi Almonds": {
+      "grams": 28,
+      "source": "notebook",
+      "original_ratios": {
+        "calories": {
+          "amount": 170,
+          "grams": 28
+        },
+        "protein": {
+          "amount": 6,
+          "grams": 28
+        },
+        "carbs": {
+          "amount": 5,
+          "grams": 28
+        },
+        "fat": {
+          "amount": 16,
+          "grams": 28
+        },
+        "fiber": {
+          "amount": 3,
+          "grams": 28
+        }
+      },
+      "calories": 170,
+      "protein": 6,
+      "carbs": 5,
+      "fat": 16,
+      "fiber": 3
+    },
+    "Olive oil": {
+      "grams": 15,
+      "source": "notebook",
+      "original_ratios": {
+        "calories": {
+          "amount": 126,
+          "grams": 15
+        },
+        "protein": {
+          "amount": 0,
+          "grams": 15
+        },
+        "fat": {
+          "amount": 14,
+          "grams": 15
+        }
+      },
+      "calories": 126,
+      "protein": 0,
+      "carbs": 0,
+      "fat": 14,
+      "fiber": 0.0
+    },
+    "Psyllium husk": {
+      "grams": 10,
+      "source": "notebook",
+      "original_ratios": {
+        "calories": {
+          "amount": 35,
+          "grams": 10
+        },
+        "carbs": {
+          "amount": 8,
+          "grams": 10
+        },
+        "fiber": {
+          "amount": 7,
+          "grams": 10
+        }
+      },
+      "calories": 35,
+      "protein": 0.0,
+      "carbs": 8,
+      "fat": 0.0,
+      "fiber": 7
+    }
+  }
+}

@@ -18,7 +18,8 @@ from flask import Flask, jsonify, redirect, render_template, request, send_from_
 from food_lookup import FoodLookupError, lookup_foods
 from food_library import (FORMAT as FOOD_BACKUP_FORMAT, VERSION as FOOD_BACKUP_VERSION,
                           validate_foods, extra_factor, checked_number as checked_library_number,
-                          category_name, category_list, PERMANENT_CATEGORY)
+                          category_name, category_list, PERMANENT_CATEGORY,
+                          label_serving_for, LABEL_NUTRIENTS)
 
 BASE_DIR = Path(__file__).resolve().parent
 FOODS_PATH = BASE_DIR / "foods.json"
@@ -833,6 +834,9 @@ def foods_page():
                     "category": category,
                     "input_mode": mode,
                     "checkbox_amount": serving_g,
+                    "label_serving": {
+                        "grams": serving_g, "calories": calories, "protein": protein,
+                        "carbs": carbs, "fat": fat, "fiber": fiber, "source": "label"},
                 }
                 with FOOD_LIBRARY_LOCK:
                     current = load_foods()
@@ -848,9 +852,21 @@ def foods_page():
 
 
 def library_backup_payload(foods: dict) -> dict:
+    # Keep recovered serving information portable even without the notebook.
+    exported = {}
+    for name, meta in foods.items():
+        label = label_serving_for(name, meta)
+        exported[name] = dict(meta)
+        if label["source"] != "reference" and "label_serving" not in meta:
+            try:
+                candidate = validate_foods({name: {**meta, "label_serving": label}})[name]
+            except ValueError:
+                pass  # A large derived checkbox portion need not be a label serving.
+            else:
+                exported[name] = candidate
     return {"format": FOOD_BACKUP_FORMAT, "version": FOOD_BACKUP_VERSION,
             "exported_at": datetime.now().isoformat(timespec="seconds"),
-            "categories": load_categories(foods), "foods": validate_foods(foods)}
+            "categories": load_categories(foods), "foods": validate_foods(exported)}
 
 
 def backup_food_library(foods: dict) -> None:
@@ -870,7 +886,8 @@ def foods_page_result(message=None, error=None, status=200):
     folder = FOODS_PATH.parent / "food_backups"
     backups = sorted((p.name for p in folder.glob("foods-*.json")), reverse=True)[:5] if folder.exists() else []
     return render_template("foods.html", grouped=grouped, categories=categories,
-                           message=message, error=error, backups=backups), status
+                           message=message, error=error, backups=backups,
+                           label_serving_for=label_serving_for), status
 
 
 @app.get("/foods/export")
@@ -1029,6 +1046,37 @@ def move_library_food():
     except ValueError as exc:
         return foods_page_result(error=str(exc), status=400)
     return foods_page_result(message=f"Moved {name} to {category}. Past days keep their original library.")
+
+
+@app.post("/foods/nutrition")
+def update_food_nutrition():
+    init_db()
+    name = request.form.get("name", "")
+    try:
+        label = {"grams": float(request.form.get("serving_g", "")), "source": "label"}
+        for nutrient in LABEL_NUTRIENTS:
+            label[nutrient] = float(request.form.get(nutrient, ""))
+        for key in ("grams", *LABEL_NUTRIENTS):
+            checked_library_number(label[key], f"Label {key}", 1_000_000)
+        if label["grams"] <= 0:
+            raise ValueError("Serving size must be greater than zero.")
+    except ValueError as exc:
+        return foods_page_result(error=str(exc), status=400)
+    with FOOD_LIBRARY_LOCK:
+        foods = load_foods()
+        if name not in foods:
+            return foods_page_result(error="That food is no longer in the library.", status=404)
+        updated = {**foods[name], "label_serving": label}
+        for nutrient, coefficient in LABEL_NUTRIENTS.items():
+            updated[coefficient] = label[nutrient] / label["grams"]
+        try:
+            updated = validate_foods({name: updated})[name]
+        except ValueError as exc:
+            return foods_page_result(error=str(exc), status=400)
+        backup_food_library(foods)
+        foods[name] = updated
+        save_foods(foods)
+    return foods_page_result(message=f"Updated nutrition for {name}. Past and locked days retain their saved values. A backup was saved.")
 
 
 @app.post("/foods/advanced")

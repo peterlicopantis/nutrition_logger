@@ -362,3 +362,26 @@ sodium in milligrams per serving. It calculates
 to the main calculator automatically. For a seasoning with 241 mg sodium per
 1 g, the 80-spin recipe's sodium target calls for approximately **9.79 g**.
 This calculator can also be used on locked days and does not modify their entries.
+
+### Editing saved nutrition labels
+
+In **Saved foods**, each row shows nutrition for its serving weight, and
+**Edit nutrition** edits the serving grams, calories, protein, carbs, fat, and
+fiber directly. Enter all values for the same serving, such as 120 calories,
+21 g protein, 4 g carbs, and 5 g fat per 112 g for Realgood Costco. The app stores
+the label numbers as well as the per-gram values needed by dashboard sliders.
+New foods preserve the original serving values entered during creation.
+
+The tracked `original_food_servings.json` contains 20 serving records recovered
+from literal fractions in the original MELB.ipynb, without executing notebook
+code. These records are used only when every current nutrient coefficient still
+matches; custom changes are never replaced with old values. Different original
+denominators, such as rice fiber recorded per 240 g, remain visible under
+**Original notebook ratios**. Stored label values take priority, then compatible
+notebook records, then a saved portion size, with a clearly marked 100 g
+reference when no serving information exists.
+
+Label nutrition edits save an automatic backup and preserve food order,
+categories, controls, salt settings, and past/locked-day nutrition. Imports and
+exports include stored and recovered serving metadata. The original notebook
+and its Downloads path are not required on another computer.

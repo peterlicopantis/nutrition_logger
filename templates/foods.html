@@ -58,7 +58,7 @@
 </form>
 
 <h2 style="font-size:1.15rem">Current foods</h2>
-<p class="small">Use Up and Down to change each category's order on the homepage. Past and locked days keep their saved order.</p>
+<p class="small">Nutrition is shown for each food's saved serving size. Use Edit nutrition to change the label values, or Up and Down to change the homepage order. Past and locked days keep their saved food settings.</p>
 {% for category, items in grouped.items() %}
 <div class="panel" id="food-category-{{ loop.index0 }}">
   <strong class="food-category-title">{{ category }}</strong>{% if category == "Dawg Bowl" %}<span class="small"> &middot; counted toward salt spins</span>{% endif %}
@@ -74,11 +74,12 @@
   {% endif %}
   <div class="food-table-scroll">
   <table style="margin-top:8px">
-    <thead><tr><th>Food</th><th>kcal/100g</th><th>P</th><th>C</th><th>F</th><th>Fiber</th></tr></thead>
+    <thead><tr><th>Food</th><th>Serving (g)</th><th>Calories</th><th>Protein (g)</th><th>Carbs (g)</th><th>Fat (g)</th><th>Fiber (g)</th></tr></thead>
     <tbody>
     {% for name, meta in items %}
       <tr>
         {% set extra = salt_extra_factor(name, meta) %}
+        {% set serving = label_serving_for(name, meta) %}
         <td class="library-food-cell">
           <strong>{{ name }}</strong>
           <form class="food-reorder" action="{{ url_for('reorder_library_food') }}" method="post">
@@ -99,6 +100,40 @@
           <span class="rice-salt-badge">{{ (1 + extra)|round(3) }}&times; salt weight</span>
           <span class="rice-salt-explanation">Salt weight: entered grams + {{ extra }}&times; extra.<br>200 g counts as {{ (200 * (1 + extra))|round(1) }} g. Calories and macros use the entered grams.</span>
           {% endif %}
+          <details class="food-nutrition">
+            <summary aria-label="Edit nutrition for {{ name }}">Edit nutrition</summary>
+            {% if serving.source == "notebook" %}
+            <p class="small">Original notebook serving recovered. Nutrition below is per {{ "%.12g"|format(serving.grams) }} g.</p>
+            {% elif serving.source == "reference" %}
+            <p class="small">Original serving size unavailable. These values use a 100 g reference; replace them with your label's serving size and nutrition.</p>
+            {% elif serving.source == "saved_portion" %}
+            <p class="small">Using the saved portion size. Nutrition is calculated from the current saved values.</p>
+            {% else %}
+            <p class="small">Values from the saved nutrition label.</p>
+            {% endif %}
+            <form class="edit-food-nutrition" action="{{ url_for('update_food_nutrition') }}" method="post" data-food="{{ name }}">
+              <input type="hidden" name="name" value="{{ name }}">
+              <div class="nutrition-edit-grid">
+                <label><span>Serving size (g)</span><input name="serving_g" type="number" min="0.000001" max="1000000" step="any" value="{{ '%.15g'|format(serving.grams) }}" inputmode="decimal" required></label>
+                <label><span>Calories / serving</span><input name="calories" type="number" min="0" max="1000000" step="any" value="{{ '%.15g'|format(serving.calories) }}" inputmode="decimal" required></label>
+                {% for key, title in [('protein', 'Protein'), ('carbs', 'Carbs'), ('fat', 'Fat'), ('fiber', 'Fiber')] %}
+                <label><span>{{ title }} (g / serving)</span><input name="{{ key }}" type="number" min="0" max="1000000" step="any" value="{{ '%.15g'|format(serving[key]) }}" inputmode="decimal" required></label>
+                {% endfor %}
+              </div>
+              {% if meta.input_mode|default("slider") == "checkbox" %}<p class="small">One check uses {{ "%.12g"|format(meta.checkbox_amount) }} g. Change that portion in Advanced settings.</p>{% endif %}
+              <p class="small">Enter all values for the same serving size. Changing the serving size keeps the numbers you type as the nutrition for that serving.</p>
+              <button class="btn" type="submit">Save nutrition</button>
+            </form>
+            {% if serving.original_ratios|default({}) %}
+            <details class="original-nutrition-ratios">
+              <summary>Original notebook ratios</summary>
+              <ul class="small">{% for nutrient, ratio in serving.original_ratios.items() %}
+                <li>{{ nutrient|capitalize }}: {{ "%.12g"|format(ratio.amount) }}{{ ' kcal' if nutrient == 'calories' else ' g' }} / {{ "%.12g"|format(ratio.grams) }} g food</li>
+              {% endfor %}</ul>
+              <p class="small">Ratios with a different denominator are converted to the serving size above.</p>
+            </details>
+            {% endif %}
+          </details>
           <details class="food-category-move">
             <summary>Move to another category</summary>
             <form action="{{ url_for('move_library_food') }}" method="post">
@@ -132,11 +167,12 @@
             <button class="btn danger" type="submit" aria-label="Remove {{ name }} from the library">Remove</button>
           </form>
         </td>
-        <td>{{ (meta.cal_per_g*100)|round(1) }}</td>
-        <td>{{ (meta.protein_per_g*100)|round(1) }}</td>
-        <td>{{ (meta.carbs_per_g*100)|round(1) }}</td>
-        <td>{{ (meta.fat_per_g*100)|round(1) }}</td>
-        <td>{{ (meta.fiber_per_g*100)|round(1) }}</td>
+        <td>{{ "%.12g"|format(serving.grams) }}{% if serving.source == "reference" %}<span class="checkbox-food-note">Reference</span>{% endif %}</td>
+        <td>{{ "%.12g"|format(serving.calories) }}</td>
+        <td>{{ "%.12g"|format(serving.protein) }}</td>
+        <td>{{ "%.12g"|format(serving.carbs) }}</td>
+        <td>{{ "%.12g"|format(serving.fat) }}</td>
+        <td>{{ "%.12g"|format(serving.fiber) }}</td>
       </tr>
     {% endfor %}
     </tbody>

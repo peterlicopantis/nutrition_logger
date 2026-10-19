@@ -1,11 +1,17 @@
 """Validate portable food-library backups and per-food salt settings."""
 import copy
 import math
+import json
+from pathlib import Path
 
 FORMAT = "melb-food-library"
 VERSION = 1
 PERMANENT_CATEGORY = "Dawg Bowl"
 NUTRIENTS = ("cal_per_g", "protein_per_g", "carbs_per_g", "fat_per_g", "fiber_per_g")
+LABEL_NUTRIENTS = dict(zip(("calories", "protein", "carbs", "fat", "fiber"), NUTRIENTS))
+with Path(__file__).with_name("original_food_servings.json").open(encoding="utf-8") as source:
+    ORIGINAL_SERVINGS = json.load(source)["foods"]
+
 
 
 def rice_name(name):
@@ -28,6 +34,49 @@ def checked_number(value, label, maximum):
     if not valid:
         raise ValueError(f"{label} must be finite and between 0 and {maximum:g}.")
     return value
+
+
+
+def validate_label_serving(label, meta, name):
+    if not isinstance(label, dict):
+        raise ValueError(f"{name}: label serving must be an object.")
+    result = copy.deepcopy(label)
+    grams = checked_number(result.get("grams"), f"{name}: label serving grams", 1_000_000)
+    if grams <= 0:
+        raise ValueError("Label serving grams must be greater than zero.")
+    for nutrient, coefficient in LABEL_NUTRIENTS.items():
+        value = checked_number(result.get(nutrient), f"{name}: label {nutrient}", 1_000_000)
+        if not math.isclose(value / grams, meta[coefficient], rel_tol=1e-9, abs_tol=1e-12):
+            raise ValueError(f"{name}: label {nutrient} does not match its per-gram nutrition.")
+    if result.get("source", "label") not in ("label", "notebook", "saved_portion", "reference"):
+        raise ValueError(f"{name}: invalid label serving source.")
+    ratios = result.get("original_ratios", {})
+    if not isinstance(ratios, dict) or any(key not in LABEL_NUTRIENTS for key in ratios):
+        raise ValueError(f"{name}: invalid original nutrition ratios.")
+    for nutrient, ratio in ratios.items():
+        if not isinstance(ratio, dict):
+            raise ValueError(f"{name}: invalid original {nutrient} ratio.")
+        amount = checked_number(ratio.get("amount"), f"{name}: original {nutrient}", 1_000_000)
+        weight = checked_number(ratio.get("grams"), f"{name}: original serving grams", 1_000_000)
+        if weight <= 0 or not math.isclose(amount / weight, meta[LABEL_NUTRIENTS[nutrient]], rel_tol=1e-9, abs_tol=1e-12):
+            raise ValueError(f"{name}: original {nutrient} ratio does not match its per-gram nutrition.")
+    result.setdefault("source", "label")
+    return result
+
+
+def label_serving_for(name, meta):
+    """Prefer stored labels, then matching notebook data, then known portions."""
+    for candidate in (meta.get("label_serving"), ORIGINAL_SERVINGS.get(name)):
+        if candidate is not None:
+            try:
+                return validate_label_serving(candidate, meta, name)
+            except ValueError:
+                pass  # Never present a stale label as current nutrition.
+    amount = meta.get("checkbox_amount")
+    known_portion = type(amount) in (int, float) and math.isfinite(amount) and amount > 0
+    grams = amount if known_portion else 100
+    return {"grams": grams, "source": "saved_portion" if known_portion else "reference",
+            **{key: meta[coefficient] * grams for key, coefficient in LABEL_NUTRIENTS.items()}}
 
 
 def category_name(value):
@@ -85,5 +134,7 @@ def validate_foods(data):
             if amount <= 0:
                 raise ValueError(f"{name}: amount per check must be greater than zero.")
             item["checkbox_amount"] = amount
+        if "label_serving" in item:
+            item["label_serving"] = validate_label_serving(item["label_serving"], item, name)
         result[name] = item
     return result

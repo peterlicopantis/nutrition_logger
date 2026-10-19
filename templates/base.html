@@ -402,6 +402,19 @@
     .library-backups summary, .food-advanced summary { cursor:pointer; color:var(--accent); }
     .food-table-scroll { overflow-x:auto; }
     .library-food-cell { min-width:190px; max-width:300px; overflow-wrap:anywhere; }
+    .food-nutrition { margin-top:8px; font-size:12px; }
+    .food-nutrition summary { cursor:pointer; color:var(--accent); }
+    .food-nutrition form { min-width:250px; max-width:420px; margin-top:10px; }
+    .nutrition-edit-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+    .nutrition-edit-grid label { display:flex; flex-direction:column; gap:4px; min-width:0; font-size:12px; }
+    .nutrition-edit-grid input { min-width:0; min-height:44px; padding:6px; font-size:16px; }
+    .food-nutrition button { padding:6px 10px; font-size:12px; }
+    .original-nutrition-ratios { margin-top:10px; }
+    .original-nutrition-ratios ul { padding-left:18px; }
+    @media (max-width:600px), (max-width:900px) and (pointer:coarse) {
+      .food-nutrition summary { padding-block:12px; }
+      .food-nutrition button { min-height:44px; }
+    }
     .food-advanced { margin-top:8px; font-size:12px; }
     .food-advanced form { margin-top:10px; max-width:260px; }
     .food-advanced input[type="number"] { max-width:130px; }
