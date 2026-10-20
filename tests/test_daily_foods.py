@@ -520,15 +520,15 @@ class SaltSpinTests(unittest.TestCase):
         amounts={"Meal":290, "Cream":500, "Test":600, "Cal":900}
         entries=[{"serving_g":61,"servings":2,"include_in_spins":True},
                  {"serving_g":100,"servings":4,"include_in_spins":False}]
-        self.assertEqual(melb.salt_spins_for(foods,amounts,entries),{"grams":412,"spins":17.3,"rice_bonus":0})
+        self.assertEqual(melb.salt_spins_for(foods,amounts,entries),{"grams":412,"spins":20.0,"rice_bonus":0})
         self.assertEqual(melb.salt_spins_for({}, {}, []),{"grams":0,"spins":0,"rice_bonus":0})
 
     def test_rice_adds_extra_one_and_a_half_times_mass_only_for_spins(self):
         foods={"Enriched Rice":{"category":"Dawg Bowl"}, "Carrot":{"category":"Dawg Bowl"}}
         result=melb.salt_spins_for(foods,{"Enriched Rice":200,"Carrot":58},[])
-        self.assertEqual(result,{"grams":558,"spins":23.5,"rice_bonus":300})
+        self.assertEqual(result,{"grams":558,"spins":27.0,"rice_bonus":300})
         rice={"name":"Rice, white, cooked", "serving_g":100,"servings":2,"include_in_spins":True}
-        self.assertEqual(melb.salt_spins_for({}, {}, [rice]),{"grams":500,"spins":21.1,"rice_bonus":300})
+        self.assertEqual(melb.salt_spins_for({}, {}, [rice]),{"grams":500,"spins":24.2,"rice_bonus":300})
         rice["include_in_spins"]=False
         self.assertEqual(melb.salt_spins_for({}, {}, [rice])["grams"],0)
         self.assertFalse(melb.is_rice_for_spins("Rice Krispies Treats"))

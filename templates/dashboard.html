@@ -34,13 +34,13 @@
 
 <div class="dashboard-actions">
   {% set salt_summary = salt_spins|default({"spins":0, "grams":0}, true) %}
-  <div class="salt-spin-summary" role="status" aria-live="polite" title="{{ salt_category|default('Dawg Bowl') }} grams plus checked logged foods and configured extra salt weight, divided by {{ salt_grams_per_spin }}.">
+  <div class="salt-spin-summary" role="status" aria-live="polite" title="{{ salt_category|default('Dawg Bowl') }} grams plus checked logged foods and configured extra salt weight, divided by {{ "%.4g"|format(salt_grams_per_spin) }}.">
     <span>Salt shaker: ~<strong id="saltSpins">{{ salt_summary.spins }}</strong> spins</span>
     <span class="small shaker-output" title="Based on your measured shaker output: 60 spins = {{ (shaker_calibration.salt_g_per_spin * 60)|round(2) }} g salt and {{ (shaker_calibration.sodium_mg_per_spin * 60)|round|int }} mg sodium. Estimates cover added shaker salt only.">
       Estimated dispensed: ~<strong id="saltDispensed">{{ "%.2f"|format(shaker_output.salt_g) }}</strong> g salt
       &middot; ~<strong id="saltSodium">{{ "{:,.0f}".format(shaker_output.sodium_mg) }}</strong> mg sodium
     </span>
-    <span class="small"><span id="saltMealGrams">{{ salt_summary.grams }}</span> g salt weight &middot; 1 spin / {{ salt_grams_per_spin }} g</span>
+    <span class="small"><span id="saltMealGrams">{{ salt_summary.grams }}</span> g salt weight &middot; 1 spin / {{ "%.4g"|format(salt_grams_per_spin) }} g</span>
     <span class="small">Extra salt weight: +<span id="saltRiceBonus">{{ salt_summary.rice_bonus|default(0) }}</span> g</span>
   </div>
   <button class="btn" id="seasoningToggle" type="button" aria-expanded="false" aria-controls="seasoningPanel">Seasoning calculator</button>
@@ -100,24 +100,31 @@
     <div id="lookupResults" class="food-results" aria-label="Matching foods"></div>
   </div>
 
+  <details class="custom-food-history" id="customFoodHistory">
+    <summary>Your custom foods <span class="small" id="customFoodHistoryCount"></span></summary>
+    <p class="small">Reuse a food you've entered manually. Removing it here keeps your daily logs.</p>
+    <label class="history-search-label" for="customFoodHistoryQuery"><span>Search your custom foods</span><input class="history-query" id="customFoodHistoryQuery" type="search" maxlength="250" placeholder="Food name" autocomplete="off"></label>
+    <p class="small" id="customFoodHistoryStatus" role="status" aria-live="polite"></p>
+    <ul class="food-history-list" id="customFoodHistoryList" aria-label="Custom food history"></ul>
+  </details>
+
   <form id="dayFoodForm" hidden>
-    <h3 class="food-editor-heading">Macros per serving</h3>
-    <p id="portionNote" class="small">Enter the values for one serving, then how many servings you ate.</p>
+    <h3 class="food-editor-heading" id="dayFoodEditorHeading">Macros per serving</h3>
+    <p id="portionNote" class="small">Enter the label values and grams for one serving, then set grams eaten. Without a serving weight, use servings eaten.</p>
     <div id="basisWarning" class="notice food-warning" hidden></div>
     <div id="portionControls" class="portion-controls" hidden>
       <label><span>Portion size</span><select id="dfPortion" aria-describedby="portionNote"></select></label>
-      <label><span id="gramLabel">Grams per serving</span><input id="dfGrams" type="number" inputmode="decimal" min="0" step="any" aria-describedby="portionNote" placeholder="Enter the weight you ate"></label>
-      <p id="portionSummary" class="small" aria-live="polite"></p>
     </div>
     <div class="day-food-grid">
       <label class="food-name-field"><span>Food name</span><input id="dfName" name="name" maxlength="160" required></label>
-      <label><span>One serving is</span><input id="dfServingLabel" name="serving_label" value="1 serving" maxlength="120" required></label>
+      <label><span>Serving description</span><input id="dfServingLabel" name="serving_label" value="1 serving" maxlength="120" required></label>
+      <label><span id="gramLabel">Grams per serving (optional)</span><input id="dfGrams" type="number" inputmode="decimal" min="0.000001" max="1000000" step="any" aria-describedby="portionNote" placeholder="e.g. 84"></label>
       <div class="amount-control serving-control" data-max="10" data-step="0.05" data-unit="servings">
         <div class="amount-heading">
-          <label for="dfServingSlider">Servings eaten</label>
-          <input id="dfServings" class="amount-value" name="servings" type="text" inputmode="decimal" value="1" aria-label="Exact servings eaten" required>
+          <label id="foodQuantityLabel" for="dfAmountSlider">Servings eaten</label>
+          <input id="dfAmount" class="amount-value" name="amount_eaten" type="text" inputmode="decimal" value="1" aria-label="Exact servings eaten" required>
         </div>
-        <input id="dfServingSlider" class="amount-range" type="range" min="0" max="10" step="any" value="1" aria-label="Servings eaten">
+        <input id="dfAmountSlider" class="amount-range" type="range" min="0" max="10" step="any" value="1" aria-label="Servings eaten">
         <div class="range-footer"><span>0</span><span class="range-limit">10 servings</span></div>
       </div>
       <label><span>Calories (kcal)</span><input id="dfCalories" name="calories" type="number" inputmode="decimal" min="0" step="any" required></label>
@@ -126,6 +133,7 @@
       <label><span>Fat (g)</span><input id="dfFat" name="fat" type="number" inputmode="decimal" min="0" step="any" required></label>
       <label><span>Fiber (g, optional)</span><input id="dfFiber" name="fiber" type="number" inputmode="decimal" min="0" step="any" placeholder="Unknown"></label>
     </div>
+    <p id="portionSummary" class="small" aria-live="polite"></p>
     <p id="foodSource" class="small" hidden></p>
     <p id="foodPreview" class="notice" aria-live="polite">Fill in the macros to preview this entry.</p>
     <div class="food-actions">
@@ -221,5 +229,5 @@
   "dayFoods": day_foods|default([], true),
   "dayFoodTotals": day_food_totals|default({}, true)
 }|tojson }}'></div>
-<script src="{{ url_for('static', filename='dashboard.js', v='seasoning-calculator-1') }}"></script>
+<script src="{{ url_for('static', filename='dashboard.js', v='temporary-food-grams-eaten-1') }}"></script>
 {% endblock %}

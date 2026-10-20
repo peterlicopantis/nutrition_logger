@@ -27,7 +27,10 @@ DEFAULT_FOODS_PATH = BASE_DIR / "foods.default.json"
 DB_PATH = BASE_DIR / "melb.db"
 CONFIG_PATH = BASE_DIR / "config.json"
 SALT_CATEGORY = PERMANENT_CATEGORY
-SALT_GRAMS_PER_SPIN = 1900 / 80  # Measured shaker calibration: 23.75 g per spin.
+# Preferred seasoning amount was 11.1 g instead of the suggested 9.65 g.
+# Adjust recipe demand; measured grams/mg dispensed per spin remain independent.
+SALT_RECIPE_ADJUSTMENT = 11.1 / 9.65
+SALT_GRAMS_PER_SPIN = (1900 / 80) / SALT_RECIPE_ADJUSTMENT
 SHAKER_SALT_G_PER_SPIN = 4.5 / 60
 SHAKER_SODIUM_MG_PER_SPIN = 1769 / 60
 CATEGORIES = [SALT_CATEGORY]
@@ -266,6 +269,21 @@ def init_db() -> None:
             if "include_in_spins" not in columns:
                 conn.execute("ALTER TABLE day_foods ADD COLUMN include_in_spins INTEGER NOT NULL DEFAULT 0")
             conn.execute("CREATE INDEX IF NOT EXISTS day_foods_day ON day_foods(day)")
+            # Backfill once when this table is first introduced. An emptied history
+            # must stay empty across restarts, even while old daily logs remain.
+            new_history = not conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'day_food_history'"
+            ).fetchone()
+            conn.execute("""CREATE TABLE IF NOT EXISTS day_food_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, name_key TEXT NOT NULL UNIQUE,
+                name TEXT NOT NULL, serving_label TEXT NOT NULL, serving_g REAL,
+                calories REAL NOT NULL, protein REAL NOT NULL, carbs REAL NOT NULL,
+                fat REAL NOT NULL, fiber REAL, updated_at TEXT NOT NULL)""")
+            if new_history:
+                for row in conn.execute(
+                    "SELECT * FROM day_foods WHERE source_url = '' ORDER BY created_at, id"
+                ).fetchall():
+                    remember_custom_day_food(conn, dict(row), updated_at=row["created_at"])
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS health_snapshots (
@@ -489,6 +507,101 @@ def api_food_lookup():
     return jsonify(ok=True, **result)
 
 
+def day_food_values(payload: dict, existing: dict | None = None) -> dict:
+    """Validate one serving, preserving optional edit metadata when omitted."""
+    previous = existing or {}
+    name = payload.get("name", "")
+    serving_label = payload.get("serving_label", "1 serving")
+    if not isinstance(name, str) or not name.strip() or len(name.strip()) > 160:
+        raise ValueError("Enter a food name (up to 160 characters).")
+    if not isinstance(serving_label, str) or not serving_label.strip() or len(serving_label.strip()) > 120:
+        raise ValueError("Enter a serving description (up to 120 characters).")
+    servings = nutrition_number(payload, "servings")
+    if servings <= 0:
+        raise ValueError("Servings must be greater than zero.")
+    values = {key: nutrition_number(payload, key) for key in ("calories", "protein", "carbs", "fat")}
+    values["fiber"] = nutrition_number(payload, "fiber", optional=True)
+    factor = (payload["salt_extra_weight_factor"] if "salt_extra_weight_factor" in payload
+              else previous.get("salt_extra_weight_factor", extra_factor(name, payload)))
+    checked_library_number(factor, "Extra salt weight", 100)
+    if "serving_g" in payload:
+        grams = nutrition_number(payload, "serving_g", optional=True)
+        if grams is None and existing is None:
+            grams = serving_grams_from_label(serving_label)
+    else:
+        grams = previous.get("serving_g") or serving_grams_from_label(serving_label)
+    if grams is not None and grams <= 0:
+        raise ValueError("Grams per serving must be greater than zero.")
+    included = payload.get("include_in_spins", bool(previous.get("include_in_spins", False)))
+    if not isinstance(included, bool):
+        raise ValueError("Choose whether to include this food in spins.")
+    if included and grams is None:
+        raise ValueError("Enter this food's grams per serving before including it in spins.")
+    source_url = payload.get("source_url", previous.get("source_url", ""))
+    if source_url is None:
+        source_url = ""
+    if not isinstance(source_url, str):
+        raise ValueError("Invalid nutrition source.")
+    if source_url and not re.fullmatch(
+        r"https://(?:world[.]openfoodfacts[.]org/product/[0-9]{8,14}|fdc[.]nal[.]usda[.]gov/food-details/[0-9]+/nutrients)",
+        source_url,
+    ):
+        raise ValueError("Invalid nutrition source.")
+    return {"name": name.strip(), "serving_label": serving_label.strip(), "servings": servings,
+            "serving_g": grams, "source_url": source_url, "include_in_spins": int(included),
+            "salt_extra_weight_factor": factor, **values}
+
+
+def custom_food_key(name: str) -> str:
+    return " ".join(name.casefold().split())
+
+
+def remember_custom_day_food(conn, entry: dict, updated_at: str | None = None) -> None:
+    if entry.get("source_url"):
+        return
+    conn.execute("""INSERT INTO day_food_history (
+        name_key, name, serving_label, serving_g, calories, protein, carbs, fat, fiber, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(name_key) DO UPDATE SET
+            name=excluded.name, serving_label=excluded.serving_label, serving_g=excluded.serving_g,
+            calories=excluded.calories, protein=excluded.protein, carbs=excluded.carbs,
+            fat=excluded.fat, fiber=excluded.fiber, updated_at=excluded.updated_at""",
+        (custom_food_key(entry["name"]), entry["name"], entry["serving_label"], entry["serving_g"],
+         entry["calories"], entry["protein"], entry["carbs"], entry["fat"], entry["fiber"],
+         updated_at or datetime.now().isoformat(timespec="microseconds")))
+
+
+@app.get("/api/day-food-history")
+def api_day_food_history():
+    query = request.args.get("q", "")
+    if len(query) > 250:
+        return jsonify(ok=False, error="Search using up to 250 characters."), 400
+    key = custom_food_key(query)
+    with FOOD_LIBRARY_LOCK:
+        init_db()
+        with db() as conn:
+            rows = conn.execute("SELECT * FROM day_food_history ORDER BY updated_at DESC, id DESC").fetchall()
+    entries = []
+    for row in rows:
+        if key and key not in row["name_key"]:
+            continue
+        entry = dict(row)
+        del entry["name_key"]
+        del entry["updated_at"]
+        entries.append({**entry, "servings": 1, "source_url": ""})
+    return jsonify(ok=True, entries=entries)
+
+
+@app.delete("/api/day-food-history/<int:history_id>")
+@serialize_day_write
+def api_remove_day_food_history(history_id: int):
+    with db() as conn:
+        cursor = conn.execute("DELETE FROM day_food_history WHERE id = ?", (history_id,))
+    if not cursor.rowcount:
+        return jsonify(ok=False, error="That food was not found in custom food history."), 404
+    return jsonify(ok=True)
+
+
 @app.post("/api/day-food")
 @serialize_day_write
 def api_add_day_food():
@@ -497,55 +610,56 @@ def api_add_day_food():
         return jsonify(ok=False, error="Send the food details as JSON."), 400
     try:
         day = required_day(payload)
-        name = payload.get("name", "")
-        serving_label = payload.get("serving_label", "1 serving")
-        if not isinstance(name, str) or not name.strip() or len(name.strip()) > 160:
-            raise ValueError("Enter a food name (up to 160 characters).")
-        if not isinstance(serving_label, str) or not serving_label.strip() or len(serving_label.strip()) > 120:
-            raise ValueError("Enter a serving description (up to 120 characters).")
-        servings = nutrition_number(payload, "servings")
-        if servings <= 0:
-            raise ValueError("Servings must be greater than zero.")
-        nutrition = {key: nutrition_number(payload, key) for key in ("calories", "protein", "carbs", "fat")}
-        nutrition["fiber"] = nutrition_number(payload, "fiber", optional=True)
-        salt_factor = extra_factor(name, payload)
-        checked_library_number(salt_factor, "Extra salt weight", 100)
-        serving_g = nutrition_number(payload, "serving_g", optional=True)
-        if serving_g is None:
-            serving_g = serving_grams_from_label(serving_label)
-        elif serving_g <= 0:
-            raise ValueError("Grams per serving must be greater than zero.")
-        source_url = payload.get("source_url") or ""
-        if not isinstance(source_url, str):
-            raise ValueError("Invalid nutrition source.")
-        if source_url and not re.fullmatch(
-            r"https://(?:world[.]openfoodfacts[.]org/product/[0-9]{8,14}|fdc[.]nal[.]usda[.]gov/food-details/[0-9]+/nutrients)",
-            source_url,
-        ):
-            raise ValueError("Invalid nutrition source.")
+        values = day_food_values(payload)
     except ValueError as exc:
         return jsonify(ok=False, error=str(exc)), 400
-
     error = locked_day_error(day)
     if error is not None:
         return error
-    init_db()
     with db() as conn:
-        cursor = conn.execute(
-            """
-            INSERT INTO day_foods(
-                day, name, serving_label, servings, calories, protein, carbs, fat,
-                fiber, source_url, created_at, serving_g, salt_extra_weight_factor
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                day, name.strip(), serving_label.strip(), servings,
-                nutrition["calories"], nutrition["protein"], nutrition["carbs"],
-                nutrition["fat"], nutrition["fiber"], source_url,
-                datetime.now().isoformat(timespec="seconds"), serving_g, salt_factor,
-            ),
-        )
+        cursor = conn.execute("""INSERT INTO day_foods(
+            day, name, serving_label, servings, calories, protein, carbs, fat, fiber,
+            source_url, created_at, serving_g, salt_extra_weight_factor, include_in_spins
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (day, values["name"], values["serving_label"], values["servings"],
+             values["calories"], values["protein"], values["carbs"], values["fat"], values["fiber"],
+             values["source_url"], datetime.now().isoformat(timespec="seconds"),
+             values["serving_g"], values["salt_extra_weight_factor"], values["include_in_spins"]))
         entry = dict(conn.execute("SELECT * FROM day_foods WHERE id = ?", (cursor.lastrowid,)).fetchone())
+        remember_custom_day_food(conn, entry)
+    return day_food_response(day, entry=entry)
+
+
+@app.patch("/api/day-food/<int:entry_id>")
+@serialize_day_write
+def api_edit_day_food(entry_id: int):
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify(ok=False, error="Send the food details as JSON."), 400
+    try:
+        day = required_day(payload)
+    except ValueError as exc:
+        return jsonify(ok=False, error=str(exc)), 400
+    error = locked_day_error(day)
+    if error is not None:
+        return error
+    with db() as conn:
+        row = conn.execute("SELECT * FROM day_foods WHERE id = ? AND day = ?", (entry_id, day)).fetchone()
+        if row is None:
+            return jsonify(ok=False, error="That food was not found on this date."), 404
+        try:
+            values = day_food_values(payload, existing=dict(row))
+        except ValueError as exc:
+            return jsonify(ok=False, error=str(exc)), 400
+        conn.execute("""UPDATE day_foods SET
+            name = ?, serving_label = ?, servings = ?, calories = ?, protein = ?, carbs = ?,
+            fat = ?, fiber = ?, source_url = ?, serving_g = ?, salt_extra_weight_factor = ?,
+            include_in_spins = ? WHERE id = ? AND day = ?""",
+            (values["name"], values["serving_label"], values["servings"], values["calories"],
+             values["protein"], values["carbs"], values["fat"], values["fiber"], values["source_url"],
+             values["serving_g"], values["salt_extra_weight_factor"], values["include_in_spins"], entry_id, day))
+        entry = dict(conn.execute("SELECT * FROM day_foods WHERE id = ?", (entry_id,)).fetchone())
+        remember_custom_day_food(conn, entry)
     return day_food_response(day, entry=entry)
 
 

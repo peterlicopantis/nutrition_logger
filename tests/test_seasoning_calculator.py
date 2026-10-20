@@ -27,7 +27,7 @@ class SeasoningCalculatorTests(unittest.TestCase):
         functions = source[source.index("function isRiceForSpins"):source.index("function renderTotals")]
         harness = r"""
 const assert=require("node:assert/strict");
-const SALT_CATEGORY="Dawg Bowl",SALT_GRAMS_PER_SPIN=23.75;
+const SALT_CATEGORY="Dawg Bowl"; let SALT_GRAMS_PER_SPIN=23.75;
 const SHAKER_CALIBRATION={salt_g_per_spin:4.5/60,sodium_mg_per_spin:1769/60};
 function n(value){return Number(value)||0;}
 function rounded(value,places=2){const p=10**places;return Math.round((value+Number.EPSILON)*p)/p;}
@@ -71,6 +71,16 @@ elements.seasoningServing.value="0,5";
 elements.seasoningSodium.value="241";
 renderSeasoningCalculator(1769);
 assert.match(elements.seasoningResult.textContent,/Use ~3.67 g/);
+"""
+        # The new recipe rate is sent by the server to the same live calculator.
+        assertions += "\nSALT_GRAMS_PER_SPIN=" + repr(melb.SALT_GRAMS_PER_SPIN) + ";"
+        assertions += r"""
+included.dataset.amount=1874;
+elements.seasoningServing.value="1";
+elements.seasoningSodium.value="241";
+renderSaltSpins();
+assert.equal(elements.seasoningResult.textContent,"Use ~11.10 g of seasoning to match ~2,676 mg sodium.");
+assert.equal(Number(elements.saltSpins.textContent),90.8);
 """
         result = subprocess.run([shutil.which("node")], input=harness+functions+assertions,
                                 text=True, encoding="utf-8", capture_output=True, timeout=10)

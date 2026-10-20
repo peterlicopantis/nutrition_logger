@@ -217,9 +217,9 @@ function attachAmountSlider(control) {
   const exact = control.querySelector(".amount-value");
   const slider = control.querySelector(".amount-range");
   const limit = control.querySelector(".range-limit");
-  const unit = control.dataset.unit;
-  const baseMax = Number(control.dataset.max);
-  const increment = Number(control.dataset.step);
+  let unit = control.dataset.unit;
+  let baseMax = Number(control.dataset.max);
+  let increment = Number(control.dataset.step);
   let committed = parseAmount(exact.value, true) ?? 0;
   exact.dataset.amount = String(committed);
   function sync(acceptValue=false) {
@@ -312,7 +312,14 @@ function attachAmountSlider(control) {
     slider.dispatchEvent(new Event("change", {bubbles:true}));
   });
   sync();
-  amountControls.set(exact, {sync, slider});
+  function setScale(nextUnit, nextMax, nextIncrement) {
+    unit = nextUnit;
+    baseMax = nextMax;
+    increment = nextIncrement;
+    slider.max = String(baseMax);
+    sync(true);
+  }
+  amountControls.set(exact, {sync, slider, setScale});
 }
 const saveChains = new WeakMap();
 const submittedAmounts = new WeakMap();
@@ -418,7 +425,7 @@ const saveDayFood = document.getElementById("saveDayFood");
 const fields = {
   name:document.getElementById("dfName"),
   serving_label:document.getElementById("dfServingLabel"),
-  servings:document.getElementById("dfServings"),
+  amount:document.getElementById("dfAmount"),
   calories:document.getElementById("dfCalories"),
   protein:document.getElementById("dfProtein"),
   carbs:document.getElementById("dfCarbs"),
@@ -428,6 +435,10 @@ const fields = {
 const portionSelect = document.getElementById("dfPortion");
 const gramInput = document.getElementById("dfGrams");
 let portionState = null;
+let quantityWeight = null;
+let quantityPinned = false;
+let quantityDraftGrams = null;
+let editingFoodId = null;
 let selectedSource = null;
 let savingFood = false;
 let lookupGeneration = 0;
@@ -438,6 +449,15 @@ let lookupInputValue = foodQuery.value;
 const LOOKUP_TIMEOUT_MS = 25000;
 const removingFoods = new Set();
 const updatingSaltFoods = new Set();
+const customHistoryPanel = document.getElementById("customFoodHistory");
+const customHistoryQuery = document.getElementById("customFoodHistoryQuery");
+const customHistoryStatus = document.getElementById("customFoodHistoryStatus");
+let customHistory = [];
+let customHistoryGeneration = 0;
+let customHistoryController = null;
+let customHistoryTimer = null;
+const removingHistoryFoods = new Set();
+
 
 function trustedSource(value) {
   if (typeof value !== "string" || value !== value.trim()) return null;
@@ -461,17 +481,23 @@ function setFoodStatus(message, isError=false) {
 }
 function resetEditor() {
   portionState = null;
+  quantityWeight = null;
+  quantityPinned = false;
+  quantityDraftGrams = null;
+  editingFoodId = null;
+  document.getElementById("dayFoodEditorHeading").textContent = "Macros per serving";
+  saveDayFood.textContent = "Save to " + DAY;
   nutrientKeys.forEach(key => fields[key].readOnly = savingFood);
   gramInput.required = false;
   gramInput.setCustomValidity("");
   portionSelect.replaceChildren();
-  document.getElementById("gramLabel").textContent = "Grams per serving";
+  document.getElementById("gramLabel").textContent = "Grams per serving (optional)";
   document.getElementById("portionControls").hidden = true;
   document.getElementById("portionSummary").textContent = "";
   document.getElementById("portionNote").textContent =
-    "Enter the values for one serving, then how many servings you ate.";
+    "Enter the label values and grams for one serving, then set grams eaten. Without a serving weight, use servings eaten.";
   dayFoodForm.reset();
-  amountControls.get(fields.servings).sync(true);
+  setQuantityScale(false);
   selectedSource = null;
   document.getElementById("basisWarning").hidden = true;
   document.getElementById("foodSource").replaceChildren();
@@ -502,19 +528,65 @@ function numericField(field, optional=false) {
   const value = Number(field.value);
   return field.value.trim() !== "" && Number.isFinite(value) && value >= 0 ? value : NaN;
 }
+function setQuantityScale(inGrams) {
+  const label = inGrams ? "Grams eaten" : "Servings eaten";
+  document.getElementById("foodQuantityLabel").textContent = label;
+  fields.amount.setAttribute("aria-label", "Exact " + label.toLowerCase());
+  const control = amountControls.get(fields.amount);
+  control.slider.setAttribute("aria-label", label);
+  control.setScale(inGrams ? "g" : "servings", inGrams ? 1000 : 10, inGrams ? 10 : 0.05);
+}
+function syncQuantityMode() {
+  const weight = portionState ? portionState.grams : numericField(gramInput, true);
+  const previousWeight = quantityWeight;
+  const amount = parseAmount(fields.amount.value);
+  if (Number.isFinite(weight) && weight > 0) {
+    if (previousWeight === null && quantityDraftGrams !== null) {
+      // Clearing a weight while replacing it must keep the user's eaten mass.
+      fields.amount.value = quantityDraftGrams;
+      quantityDraftGrams = null;
+      quantityPinned = true;
+    } else if (previousWeight === null || (!quantityPinned && weight !== previousWeight)) {
+      const servings = previousWeight === null ? amount : amount / previousWeight;
+      if (amount !== null) fields.amount.value = rounded(servings * weight, 10);
+    }
+    quantityWeight = weight;
+  } else if (!portionState && weight === null && previousWeight !== null) {
+    // An intentionally cleared manual weight returns to servings, preserving
+    // the nutrition multiplier. Invalid/incomplete weights cannot reinterpret g.
+    quantityDraftGrams = quantityPinned ? amount : null;
+    if (amount !== null) fields.amount.value = rounded(amount / previousWeight, 10);
+    quantityWeight = null;
+    quantityPinned = false;
+  }
+  if ((quantityWeight === null) !== (previousWeight === null)) {
+    setQuantityScale(quantityWeight !== null);
+  } else {
+    amountControls.get(fields.amount).sync();
+  }
+}
+function pinQuantity() {
+  if (quantityWeight !== null) quantityPinned = true;
+  else quantityDraftGrams = null;
+}
+fields.amount.addEventListener("input", pinQuantity);
+amountControls.get(fields.amount).slider.addEventListener("input", pinQuantity);
 function readFoodValues() {
+  const servingGrams = portionState ? (portionIsValid() ? portionState.grams : NaN) : numericField(gramInput, true);
+  const amount = parseAmount(fields.amount.value) ?? NaN;
   const values = {
     name:fields.name.value.trim(),
     serving_label:fields.serving_label.value.trim(),
-    servings:parseAmount(fields.servings.value) ?? NaN,
+    servings:quantityWeight === null ? amount : amount / servingGrams,
     source_url:selectedSource,
-    serving_g:portionState && portionIsValid() ? portionState.grams : null
+    serving_g:servingGrams
   };
   nutrientKeys.forEach(key => values[key] = numericField(fields[key], key === "fiber"));
   return values;
 }
 function hasValidMacros(values) {
   return portionIsValid() && Number.isFinite(values.servings) && values.servings > 0 &&
+    (values.serving_g === null || (Number.isFinite(values.serving_g) && values.serving_g > 0 && values.serving_g <= 1000000)) &&
     nutrientKeys.every(key => (key === "fiber" && values[key] === null) ||
       (Number.isFinite(values[key]) && Number.isFinite(values[key] * values.servings)));
 }
@@ -530,12 +602,13 @@ function macroSummary(food) {
   return pieces.join(" · ");
 }
 function renderFoodPreview() {
+  syncQuantityMode();
   const values = readFoodValues();
-  const totalGrams = portionIsValid() && portionState && Number.isFinite(values.servings) ?
-    portionState.grams * values.servings : null;
+  const totalGrams = Number.isFinite(values.serving_g) && values.serving_g > 0 && Number.isFinite(values.servings) ?
+    values.serving_g * values.servings : null;
   document.getElementById("portionSummary").textContent = totalGrams != null ?
-    "Total eaten: " + (portionState.estimated ? "~" : "") + rounded(totalGrams, 3) +
-      " g (" + rounded(values.servings, 3) + " x " + rounded(portionState.grams, 3) + " g per serving)." : "";
+    "Total eaten: " + (portionState?.estimated && !quantityPinned ? "~" : "") + rounded(totalGrams, 3) +
+      " g (" + rounded(values.servings, 3) + " x " + rounded(values.serving_g, 3) + " g per serving)." : "";
   document.getElementById("foodPreview").textContent = hasValidMacros(values)
     ? "This entry adds: "+macroSummary(values)
     : "Fill in the macros to preview this entry.";
@@ -558,14 +631,14 @@ function scalePortionMacros() {
   });
 }
 function applyPortion(portion, estimated, writeGrams=true) {
-  const oldCountable = portionState.countable;
+  if (!quantityPinned && portion.id !== "custom" && portionState.countable && !portion.countable) {
+    // A search count such as two carrots does not mean two cups. Once the
+    // user enters their own eaten grams, changing the label keeps that mass.
+    fields.amount.value = quantityWeight === null ? 1 : quantityWeight;
+  }
   portionState.grams = portion.grams;
   portionState.estimated = estimated;
   portionState.countable = Boolean(portion.countable);
-  if (portion.id !== "custom" && oldCountable && !portionState.countable) {
-    fields.servings.value = 1;
-    amountControls.get(fields.servings).sync(true);
-  }
   if (writeGrams) gramInput.value = portion.grams;
   gramInput.setCustomValidity("");
   document.getElementById("basisWarning").hidden = true;
@@ -584,7 +657,14 @@ portionSelect.addEventListener("change", () => {
   } else gramInput.focus();
 });
 gramInput.addEventListener("input", () => {
-  if (!portionState || savingFood) return;
+  if (savingFood) return;
+  if (!portionState) {
+    // Manual/edit/history values are already per serving. Weight records mass;
+    // it must not multiply or overwrite the entered label macros.
+    gramInput.setCustomValidity("");
+    renderFoodPreview();
+    return;
+  }
   const grams = numericField(gramInput);
   if (!Number.isFinite(grams) || grams <= 0) {
     portionState.grams = null;
@@ -644,21 +724,21 @@ function setupPortion(product) {
   gramInput.required = true;
   const selected = portions.find(portion => portion.id === String(product.default_portion_id)) || portions[0];
   document.getElementById("portionNote").textContent = product.kind === "generic" ?
-    "Typical edible weights are estimates. Choose a size or enter your measured grams, then set servings eaten." :
-    "Start with the label serving or enter your measured grams, then set servings eaten.";
+    "Typical edible weights are estimates. Choose a serving size, then enter the total grams you ate." :
+    "Check the label serving, then enter the total grams you ate.";
   if (selected && (product.basis === "serving" || selected.id === "reference-100g")) {
     portionSelect.value = selected.id;
     applyPortion(selected, portionState.sourceEstimated);
     if (selected.id === "reference-100g") {
       document.getElementById("portionNote").textContent =
-        "Nutrition starts at the database's 100 g reference. Change grams per serving to the amount you ate, then set servings eaten.";
+        "Nutrition starts at the database's 100 g reference. Enter the total grams you ate; the nutrition scales to that weight.";
       document.getElementById("basisWarning").hidden = false;
       document.getElementById("basisWarning").textContent =
-        "100 g is a reference amount, not a known item or package serving. Change the grams to match your portion; macros scale automatically.";
+        "100 g is a reference amount, not a known item or package serving. Set Grams eaten to your measured weight.";
     }
   } else {
     portionSelect.value = "custom";
-    fields.servings.value = 1;
+    fields.amount.value = 1;
     fields.serving_label.value = "Custom portion";
     nutrientKeys.forEach(key => {
       fields[key].value = "";
@@ -680,7 +760,7 @@ function selectProduct(product, suggestedServings) {
   fields.serving_label.value = product.basis === "100g" ? "100 g" : (product.serving_label || "1 serving");
   // Item-count hints apply only to sourced single-item portions. A label
   // serving may contain several items, and a cup is a different measure.
-  fields.servings.value = product.portion_countable && Number.isFinite(Number(suggestedServings)) &&
+  fields.amount.value = product.portion_countable && Number.isFinite(Number(suggestedServings)) &&
     Number(suggestedServings) > 0 ? Number(suggestedServings) : 1;
   nutrientKeys.forEach(key => fields[key].value = product[key] == null ? "" : product[key]);
   selectedSource = trustedSource(product.source_url);
@@ -690,10 +770,45 @@ function selectProduct(product, suggestedServings) {
   setupPortion(product);
   dayFoodForm.hidden = false;
   setFoodStatus("");
-  amountControls.get(fields.servings).sync(true);
+  amountControls.get(fields.amount).sync(true);
   renderFoodPreview();
-  (portionState && !portionIsValid() ? gramInput : amountControls.get(fields.servings).slider).focus();
+  (portionState && !portionIsValid() ? gramInput : amountControls.get(fields.amount).slider).focus();
 }
+function loadManualFood(food, entryId=null) {
+  if (savingFood || DAY_LOCKED || dayLockChanging) return;
+  if (entryId !== null && (removingFoods.has(entryId) || updatingSaltFoods.has(entryId))) return;
+  invalidateLookup();
+  resetEditor();
+  fields.name.value = food.name;
+  fields.serving_label.value = food.serving_label || "1 serving";
+  fields.amount.value = entryId === null ? 1 : food.servings;
+  nutrientKeys.forEach(key => fields[key].value = food[key] == null ? "" : food[key]);
+  gramInput.value = Number(food.serving_g) > 0 ? food.serving_g : "";
+  selectedSource = trustedSource(food.source_url);
+  const source = document.getElementById("foodSource");
+  addSourceLink(source, selectedSource);
+  source.hidden = !selectedSource;
+  editingFoodId = entryId;
+  document.getElementById("dayFoodEditorHeading").textContent = entryId === null ? "Macros per serving" : "Edit logged food";
+  saveDayFood.textContent = entryId === null ? "Save to " + DAY : "Save changes";
+  document.getElementById("portionNote").textContent =
+    "Enter nutrition and grams for one serving, then the total grams eaten. Changing the serving weight keeps your entered macros.";
+  document.getElementById("lookupArea").hidden = true;
+  document.getElementById("lookupMode").setAttribute("aria-pressed", "false");
+  document.getElementById("manualMode").setAttribute("aria-pressed", "true");
+  document.getElementById("dayFoodPanel").open = true;
+  dayFoodForm.hidden = false;
+  amountControls.get(fields.amount).sync(true);
+  setFoodStatus("");
+  renderFoodPreview();
+  quantityPinned = entryId !== null && quantityWeight !== null;
+  dayFoodForm.scrollIntoView({block:"nearest"});
+  fields.amount.focus();
+}
+function editDayFood(food) {
+  loadManualFood(food, food.id);
+}
+
 function renderLookupResults(products, suggestedServings) {
   lookupResults.replaceChildren();
   for (const product of products) {
@@ -720,6 +835,110 @@ function renderLookupResults(products, suggestedServings) {
     lookupResults.appendChild(card);
   }
 }
+function renderCustomFoodHistory() {
+  const list = document.getElementById("customFoodHistoryList");
+  list.replaceChildren();
+  document.getElementById("customFoodHistoryCount").textContent = customHistory.length ? "(" + customHistory.length + ")" : "";
+  for (const food of customHistory) {
+    const item = document.createElement("li");
+    item.className = "food-history-item";
+    item.dataset.historyId = food.id;
+    const content = document.createElement("div");
+    const name = document.createElement("strong");
+    name.textContent = food.name;
+    const basis = document.createElement("p");
+    basis.className = "small";
+    basis.textContent = "Per " + (food.serving_label || "1 serving") +
+      (Number(food.serving_g) > 0 ? " (" + rounded(Number(food.serving_g), 3) + " g)" : "");
+    const macros = document.createElement("p");
+    macros.className = "small";
+    macros.textContent = macroSummary({...food, servings:1});
+    content.append(name, basis, macros);
+    const actions = document.createElement("div");
+    actions.className = "food-history-actions";
+    const busy = removingHistoryFoods.has(food.id);
+    const use = document.createElement("button");
+    use.type = "button";
+    use.className = "btn use-history-food";
+    use.textContent = "Use this food";
+    use.disabled = DAY_LOCKED || dayLockChanging || savingFood || busy;
+    use.addEventListener("click", () => {
+      if (!removingHistoryFoods.has(food.id)) loadManualFood(food);
+    });
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "btn danger history-remove";
+    remove.textContent = busy ? "Removing..." : "Remove from history";
+    remove.disabled = busy || savingFood;
+    remove.setAttribute("aria-label", "Remove " + food.name + " from history");
+    remove.addEventListener("click", () => removeCustomFoodHistory(food.id));
+    actions.append(use, remove);
+    item.append(content, actions);
+    list.appendChild(item);
+  }
+}
+async function refreshCustomFoodHistory() {
+  clearTimeout(customHistoryTimer);
+  customHistoryController?.abort();
+  const generation = ++customHistoryGeneration;
+  const controller = new AbortController();
+  customHistoryController = controller;
+  const query = customHistoryQuery.value.trim();
+  let timedOut = false;
+  const timeout = setTimeout(() => { timedOut = true; controller.abort(); }, 15000);
+  customHistoryStatus.textContent = "Loading custom foods...";
+  customHistoryStatus.classList.remove("food-error");
+  try {
+    const data = await requestJson("/api/day-food-history?q=" + encodeURIComponent(query), {
+      signal:controller.signal, cache:"no-store"
+    });
+    if (generation !== customHistoryGeneration || customHistoryQuery.value.trim() !== query) return;
+    customHistory = Array.isArray(data.entries) ? data.entries : [];
+    renderCustomFoodHistory();
+    customHistoryStatus.textContent = customHistory.length ? "" :
+      query ? "No matching custom foods." : "Your manually entered foods will appear here after saving.";
+  } catch (error) {
+    if (generation !== customHistoryGeneration) return;
+    if (error.name === "AbortError" && !timedOut) return;
+    customHistory = [];
+    renderCustomFoodHistory();
+    customHistoryStatus.classList.add("food-error");
+    customHistoryStatus.textContent = "Could not load custom food history. Change the search to try again.";
+  } finally {
+    clearTimeout(timeout);
+    if (generation === customHistoryGeneration) customHistoryController = null;
+  }
+}
+function queueCustomFoodHistory() {
+  clearTimeout(customHistoryTimer);
+  customHistoryController?.abort();
+  customHistoryGeneration++;
+  customHistory = [];
+  renderCustomFoodHistory();
+  customHistoryStatus.textContent = "Searching custom foods...";
+  customHistoryStatus.classList.remove("food-error");
+  customHistoryTimer = setTimeout(refreshCustomFoodHistory, 200);
+}
+customHistoryQuery.addEventListener("input", queueCustomFoodHistory);
+customHistoryQuery.addEventListener("search", queueCustomFoodHistory);
+async function removeCustomFoodHistory(id) {
+  if (removingHistoryFoods.has(id) || savingFood) return;
+  removingHistoryFoods.add(id);
+  renderCustomFoodHistory();
+  try {
+    await requestJson("/api/day-food-history/" + encodeURIComponent(id), {method:"DELETE"});
+    customHistory = customHistory.filter(food => food.id !== id);
+    renderCustomFoodHistory();
+    await refreshCustomFoodHistory();
+  } catch (error) {
+    customHistoryStatus.classList.add("food-error");
+    customHistoryStatus.textContent = "Could not remove this food from history. Try again.";
+  } finally {
+    removingHistoryFoods.delete(id);
+    renderCustomFoodHistory();
+  }
+}
+
 async function requestJson(url, options={}) {
   const response = await fetch(url, options);
   let data;
@@ -752,6 +971,9 @@ function handleQueryEdit() {
   if (foodQuery.value === lookupInputValue) return;
   lookupInputValue = foodQuery.value;
   invalidateLookup();
+  customHistoryQuery.value = foodQuery.value;
+  queueCustomFoodHistory();
+  if (foodQuery.value.trim()) customHistoryPanel.open = true;
   if (!savingFood && document.getElementById("lookupMode").getAttribute("aria-pressed") === "true") {
     resetEditor();
     dayFoodForm.hidden = true;
@@ -830,7 +1052,10 @@ function renderDayFoods() {
   list.replaceChildren();
   document.getElementById("dayFoodEmpty").hidden = dayFoods.length > 0;
   for (const food of dayFoods) {
+    const busy = DAY_LOCKED || dayLockChanging || updatingSaltFoods.has(food.id) || removingFoods.has(food.id) ||
+      (savingFood && editingFoodId === food.id);
     const item = document.createElement("li");
+    item.dataset.entryId = food.id;
     item.className = "day-food-item";
     const content = document.createElement("div");
     const name = document.createElement("strong");
@@ -852,7 +1077,7 @@ function renderDayFoods() {
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
     checkbox.checked = Boolean(food.include_in_spins);
-    checkbox.disabled = DAY_LOCKED || dayLockChanging || !(Number(food.serving_g) > 0) || updatingSaltFoods.has(food.id) || removingFoods.has(food.id);
+    checkbox.disabled = busy || !(Number(food.serving_g) > 0);
     checkbox.setAttribute("aria-label", "Include "+food.name+" in salt shaker spins");
     checkbox.addEventListener("change", () => saveSaltSelection(food, checkbox.checked));
     const caption = document.createElement("span");
@@ -872,7 +1097,7 @@ function renderDayFoods() {
       mass.step = "any";
       mass.inputMode = "decimal";
       mass.placeholder = "Weight needed";
-      mass.disabled = DAY_LOCKED || dayLockChanging || updatingSaltFoods.has(food.id) || removingFoods.has(food.id);
+      mass.disabled = busy;
       mass.setAttribute("aria-label", food.name+" grams per serving");
       mass.addEventListener("change", () => {
         const grams = numericField(mass);
@@ -893,15 +1118,26 @@ function renderDayFoods() {
     remove.className = "btn danger";
     remove.type = "button";
     remove.textContent = removingFoods.has(food.id) ? "Removing…" : "Remove";
-    remove.disabled = DAY_LOCKED || dayLockChanging || removingFoods.has(food.id) || updatingSaltFoods.has(food.id);
+    remove.disabled = busy;
     remove.setAttribute("aria-label", "Remove "+food.name+" from "+DAY);
     remove.addEventListener("click", () => removeDayFood(food.id));
-    item.append(content, remove);
+    const edit = document.createElement("button");
+    edit.className = "btn edit-day-food";
+    edit.type = "button";
+    edit.textContent = "Edit";
+    edit.disabled = busy;
+    edit.setAttribute("aria-label", "Edit " + food.name + " on " + DAY);
+    edit.addEventListener("click", () => editDayFood(food));
+    const actions = document.createElement("div");
+    actions.className = "day-food-actions";
+    actions.append(edit, remove);
+    item.append(content, actions);
     list.appendChild(item);
   }
 }
 async function saveSaltSelection(food, included, grams=food.serving_g) {
-  if (DAY_LOCKED || dayLockChanging || updatingSaltFoods.has(food.id) || removingFoods.has(food.id)) return;
+  if (DAY_LOCKED || dayLockChanging || updatingSaltFoods.has(food.id) || removingFoods.has(food.id) ||
+      (savingFood && editingFoodId === food.id)) return;
   updatingSaltFoods.add(food.id);
   renderDayFoods();
   setFoodStatus("");
@@ -922,7 +1158,8 @@ async function saveSaltSelection(food, included, grams=food.serving_g) {
 }
 
 async function removeDayFood(id) {
-  if (DAY_LOCKED || dayLockChanging || removingFoods.has(id) || updatingSaltFoods.has(id)) return;
+  if (DAY_LOCKED || dayLockChanging || removingFoods.has(id) || updatingSaltFoods.has(id) ||
+      (savingFood && editingFoodId === id)) return;
   removingFoods.add(id);
   renderDayFoods();
   setFoodStatus("");
@@ -933,6 +1170,10 @@ async function removeDayFood(id) {
       body:JSON.stringify({day:DAY})
     });
     dayFoods = dayFoods.filter(food => food.id !== id);
+    if (editingFoodId === id) {
+      resetEditor();
+      dayFoodForm.hidden = true;
+    }
     updateDayFoods(data);
     setFoodStatus("Food removed from "+DAY+".");
   } catch (error) {
@@ -945,16 +1186,23 @@ async function removeDayFood(id) {
 dayFoodForm.addEventListener("submit", async event => {
   event.preventDefault();
   if (DAY_LOCKED || dayLockChanging || savingFood || !dayFoodForm.reportValidity()) return;
-  const values = readFoodValues();
-  if (!values.name || !values.serving_label || !hasValidMacros(values)) {
-    setFoodStatus("Enter a food name, serving size, and valid nonnegative macros. Servings eaten must be greater than zero.", true);
+  if (editingFoodId !== null && (updatingSaltFoods.has(editingFoodId) || removingFoods.has(editingFoodId))) {
+    setFoodStatus("Wait for this food's current change to finish, then save your edit.", true);
     return;
   }
+  const values = readFoodValues();
+  if (!values.name || !values.serving_label || !hasValidMacros(values)) {
+    setFoodStatus("Enter a food name, serving size, and valid nonnegative macros. The amount eaten must be greater than zero.", true);
+    return;
+  }
+  const submittedEditId = editingFoodId;
   savingFood = true;
+  renderDayFoods();
+  renderCustomFoodHistory();
   Object.values(fields).forEach(field => field.readOnly = true);
   gramInput.readOnly = true;
   portionSelect.disabled = true;
-  amountControls.get(fields.servings).slider.disabled = true;
+  amountControls.get(fields.amount).slider.disabled = true;
   saveDayFood.disabled = true;
   document.getElementById("cancelDayFood").disabled = true;
   document.getElementById("lookupMode").disabled = true;
@@ -962,16 +1210,18 @@ dayFoodForm.addEventListener("submit", async event => {
   saveDayFood.textContent = "Saving…";
   setFoodStatus("");
   try {
-    const data = await requestJson("/api/day-food", {
-      method:"POST",
+    const data = await requestJson(submittedEditId === null ? "/api/day-food" : "/api/day-food/" + encodeURIComponent(submittedEditId), {
+      method:submittedEditId === null ? "POST" : "PATCH",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({day:DAY, ...values})
     });
-    dayFoods.push(data.entry);
+    if (submittedEditId === null) dayFoods.push(data.entry);
+    else dayFoods = dayFoods.map(entry => entry.id === submittedEditId ? data.entry : entry);
     updateDayFoods(data);
     resetEditor();
-    dayFoodForm.hidden = document.getElementById("manualMode").getAttribute("aria-pressed") !== "true";
-    setFoodStatus(values.name+" saved to "+DAY+".");
+    dayFoodForm.hidden = submittedEditId !== null || document.getElementById("manualMode").getAttribute("aria-pressed") !== "true";
+    setFoodStatus(values.name + (submittedEditId === null ? " saved to " : " updated for ") + DAY + ".");
+    refreshCustomFoodHistory();
   } catch (error) {
     setFoodStatus(error instanceof TypeError ? "Could not save this food. Check your connection and try again." : error.message, true);
   } finally {
@@ -979,12 +1229,14 @@ dayFoodForm.addEventListener("submit", async event => {
     Object.values(fields).forEach(field => field.readOnly = false);
     gramInput.readOnly = false;
     portionSelect.disabled = false;
-    amountControls.get(fields.servings).slider.disabled = false;
+    amountControls.get(fields.amount).slider.disabled = false;
     saveDayFood.disabled = false;
     document.getElementById("cancelDayFood").disabled = false;
     document.getElementById("lookupMode").disabled = false;
     document.getElementById("manualMode").disabled = false;
-    saveDayFood.textContent = "Save to "+DAY;
+    saveDayFood.textContent = editingFoodId === null ? "Save to "+DAY : "Save changes";
+    renderDayFoods();
+    renderCustomFoodHistory();
   }
 });
 renderDayFoods();
@@ -993,9 +1245,10 @@ renderTotals();
 function applyDayEditingState() {
   const blocked = DAY_LOCKED || dayLockChanging;
   inputs.forEach(input => input.disabled = blocked);
-  document.querySelectorAll(".foodrow .amount-range, #dayFoodPanel input, #dayFoodPanel button, #dayFoodPanel select, #dayFoodPanel textarea")
+  document.querySelectorAll(".foodrow .amount-range, #dayFoodPanel input:not(.history-query), #dayFoodPanel button:not(.history-remove), #dayFoodPanel select, #dayFoodPanel textarea")
     .forEach(control => control.disabled = blocked);
   document.getElementById("resetDayButton").disabled = blocked;
+  renderCustomFoodHistory();
   document.querySelectorAll("#dayFoodList input, #dayFoodList button")
     .forEach(control => {
       if (blocked) control.disabled = true;
@@ -1052,3 +1305,5 @@ seasoningToggle.addEventListener("click", () => {
 });
 ["seasoningServing", "seasoningSodium"].forEach(id =>
   document.getElementById(id).addEventListener("input", () => renderSeasoningCalculator()));
+
+refreshCustomFoodHistory();

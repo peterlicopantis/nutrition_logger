@@ -149,6 +149,23 @@
     .food-name-field { grid-column:span 2; }
     .food-warning { background:#362b12; border-color:#786023; }
     .food-error { color:#fecaca; }
+    .custom-food-history { margin:12px 0; border-top:1px solid var(--border); padding-top:10px; }
+    .custom-food-history > summary { cursor:pointer; color:var(--accent); font-size:14px; font-weight:650; }
+    .custom-food-history > summary .small { margin-left:6px; font-weight:400; }
+    .history-search-label { display:block; max-width:440px; }
+    .food-history-list { list-style:none; padding:0; margin:8px 0; max-height:280px; overflow-y:auto; }
+    .food-history-item { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 0; border-top:1px solid var(--border); }
+    .food-history-item > div:first-child { min-width:0; overflow-wrap:anywhere; }
+    .food-history-item p { margin:4px 0; }
+    .food-history-actions, .day-food-actions { display:flex; flex:0 0 auto; align-items:center; gap:6px; flex-wrap:wrap; }
+    .day-food-actions { margin-left:auto; }
+    @media (max-width:600px), (max-width:900px) and (pointer:coarse) {
+      .custom-food-history > summary { min-height:44px; padding:10px 0; }
+      .history-search-label input, .food-history-actions button, .day-food-actions button { min-height:44px; }
+      .food-history-item, .day-food-item { flex-wrap:wrap; }
+      .food-history-actions { margin-left:auto; }
+    }
+
     .day-food-list { list-style:none; margin:0; padding:0; }
     .day-food-item { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 0; border-top:1px solid var(--border); }
     .day-food-item > div { min-width:0; overflow-wrap:anywhere; }

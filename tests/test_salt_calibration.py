@@ -16,22 +16,23 @@ class SaltCalibrationTests(unittest.TestCase):
             "day":"2026-10-07", "food_name":"Regular food", "amount":1900})
         self.assertEqual(response.status_code, 200)
 
-    def test_measured_recipe_is_eighty_spins_in_formula_and_dashboard(self):
+    def test_recipe_uses_preferred_seasoning_adjustment_in_formula_and_dashboard(self):
         result = melb.salt_spins_for(melb.load_foods(), {"Regular food":1900}, [])
         self.assertEqual(result["grams"], 1900)
-        self.assertEqual(result["spins"], 80)
+        self.assertEqual(result["spins"], 92.0)
         html = self.client.get("/?day=2026-10-07").get_data(as_text=True)
-        self.assertIn('id="saltSpins">80.0', html)
-        self.assertIn('1 spin / 23.75 g', html)
-        self.assertIn('"saltGramsPerSpin": 23.75', html)
+        self.assertIn('id="saltSpins">92.0', html)
+        self.assertIn('1 spin / 20.65 g', html)
+        self.assertIn('"saltGramsPerSpin": ' + str(melb.SALT_GRAMS_PER_SPIN), html)
 
     def test_new_locked_day_retains_calibration_after_future_adjustments(self):
         self.client.post("/api/day-lock", json={"day":"2026-10-07", "locked":True})
-        self.assertEqual(melb.locked_day_snapshot("2026-10-07")["salt_grams_per_spin"], 23.75)
+        saved_rate = melb.SALT_GRAMS_PER_SPIN
+        self.assertEqual(melb.locked_day_snapshot("2026-10-07")["salt_grams_per_spin"], saved_rate)
         with patch.object(melb, "SALT_GRAMS_PER_SPIN", 30):
             html = self.client.get("/?day=2026-10-07").get_data(as_text=True)
-            self.assertIn('id="saltSpins">80.0', html)
-            self.assertIn('"saltGramsPerSpin": 23.75', html)
+            self.assertIn('id="saltSpins">92.0', html)
+            self.assertIn('"saltGramsPerSpin": ' + str(saved_rate), html)
             self.client.post("/api/day-lock", json={"day":"2026-10-07", "locked":False})
             html = self.client.get("/?day=2026-10-07").get_data(as_text=True)
             self.assertIn('id="saltSpins">63.3', html)
@@ -48,7 +49,7 @@ class SaltCalibrationTests(unittest.TestCase):
         self.assertIn('"saltGramsPerSpin": 29', html)
         self.client.post("/api/day-lock", json={"day":"2026-10-07", "locked":False})
         html = self.client.get("/?day=2026-10-07").get_data(as_text=True)
-        self.assertIn('id="saltSpins">80.0', html)
+        self.assertIn('id="saltSpins">92.0', html)
 
     def test_shaker_measurement_and_half_measurement(self):
         calibration = {"salt_g_per_spin":4.5 / 60, "sodium_mg_per_spin":1769 / 60}
@@ -59,17 +60,17 @@ class SaltCalibrationTests(unittest.TestCase):
 
     def test_page_estimates_sixty_spins_and_uses_unrounded_spin_calculation(self):
         self.client.post("/api/entry", json={
-            "day":"2026-10-07", "food_name":"Regular food", "amount":1425})
+            "day":"2026-10-07", "food_name":"Regular food", "amount":60 * melb.SALT_GRAMS_PER_SPIN})
         html = self.client.get("/?day=2026-10-07").get_data(as_text=True)
         self.assertIn('id="saltSpins">60.0', html)
         self.assertIn('id="saltDispensed">4.50', html)
         self.assertIn('id="saltSodium">1,769', html)
         self.assertIn("added shaker salt only", html)
-        # 100 g rounds to 4.2 spins, but output must use 100 / 23.75.
+        # Use the full spin calculation, rather than the rounded displayed count.
         self.client.post("/api/entry", json={
             "day":"2026-10-07", "food_name":"Regular food", "amount":100})
         html = self.client.get("/?day=2026-10-07").get_data(as_text=True)
-        self.assertIn('id="saltSodium">124', html)
+        self.assertIn('id="saltSodium">143', html)
 
     def test_locked_shaker_output_keeps_measured_dispensing_rates(self):
         self.client.post("/api/day-lock", json={"day":"2026-10-07", "locked":True})
@@ -79,12 +80,12 @@ class SaltCalibrationTests(unittest.TestCase):
         with patch.object(melb, "SHAKER_SALT_G_PER_SPIN", .1), \
              patch.object(melb, "SHAKER_SODIUM_MG_PER_SPIN", 40):
             html = self.client.get("/?day=2026-10-07").get_data(as_text=True)
-            self.assertIn('id="saltDispensed">6.00', html)
-            self.assertIn('id="saltSodium">2,359', html)
+            self.assertIn('id="saltDispensed">6.90', html)
+            self.assertIn('id="saltSodium">2,713', html)
             self.client.post("/api/day-lock", json={"day":"2026-10-07", "locked":False})
             html = self.client.get("/?day=2026-10-07").get_data(as_text=True)
-            self.assertIn('id="saltDispensed">8.00', html)
-            self.assertIn('id="saltSodium">3,200', html)
+            self.assertIn('id="saltDispensed">9.20', html)
+            self.assertIn('id="saltSodium">3,681', html)
 
     def test_older_snapshot_gets_initial_output_estimates_without_rewriting_snapshot(self):
         self.client.post("/api/day-lock", json={"day":"2026-10-07", "locked":True})
@@ -95,7 +96,7 @@ class SaltCalibrationTests(unittest.TestCase):
                          (json.dumps(snapshot), "2026-10-07"))
         with patch.object(melb, "SHAKER_SALT_G_PER_SPIN", .1):
             html = self.client.get("/?day=2026-10-07").get_data(as_text=True)
-        self.assertIn('id="saltDispensed">6.00', html)
+        self.assertIn('id="saltDispensed">6.90', html)
         self.assertNotIn("shaker_calibration", melb.locked_day_snapshot("2026-10-07"))
 
     @unittest.skipUnless(shutil.which("node"), "Node.js is needed for live calculator checks")
@@ -137,3 +138,28 @@ assert.equal(elements.saltSodium.textContent,"0");
         result = subprocess.run([shutil.which("node")], input=harness + functions + assertions,
                                 text=True, capture_output=True, timeout=10)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_previous_locked_recipe_keeps_its_prior_recipe_rate(self):
+        self.client.post("/api/day-lock", json={"day":"2026-10-07", "locked":True})
+        snapshot = melb.locked_day_snapshot("2026-10-07")
+        snapshot["salt_grams_per_spin"] = 23.75
+        with melb.db() as conn:
+            conn.execute("UPDATE day_locks SET snapshot_json=? WHERE day=?",
+                         (json.dumps(snapshot), "2026-10-07"))
+        html = self.client.get("/?day=2026-10-07").get_data(as_text=True)
+        self.assertIn('id="saltSpins">80.0', html)
+        self.assertIn('id="saltSodium">2,359', html)
+        self.assertEqual(melb.locked_day_snapshot("2026-10-07"),snapshot)
+
+    def test_screenshot_recipe_now_matches_preferred_eleven_point_one_grams(self):
+        self.client.post("/api/entry", json={
+            "day":"2026-10-07", "food_name":"Regular food", "amount":1874})
+        html = self.client.get("/?day=2026-10-07").get_data(as_text=True)
+        self.assertIn('id="saltSpins">90.8', html)
+        self.assertIn('id="saltSodium">2,676', html)
+        grams = 1874 / melb.SALT_GRAMS_PER_SPIN * melb.SHAKER_SODIUM_MG_PER_SPIN / 241
+        self.assertEqual(round(grams,2),11.10)
+        self.assertEqual(melb.shaker_output_for(60,{
+            "salt_g_per_spin":melb.SHAKER_SALT_G_PER_SPIN,
+            "sodium_mg_per_spin":melb.SHAKER_SODIUM_MG_PER_SPIN}),
+            {"salt_g":4.5,"sodium_mg":1769})

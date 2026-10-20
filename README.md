@@ -150,10 +150,10 @@ On the dashboard, select a date and use **Add food for this day**:
 
 - **Food lookup** accepts a product name, a short description such as
   "Oh I had a rice krispy treat", or a package barcode. Choose the matching
-  brand and size, review the nutrition, and adjust the servings before saving.
+  brand and size, review the nutrition, and enter grams eaten before saving.
 - **Enter macros** lets you enter the calories, protein, carbs, fat, and
-  optional fiber you know. Enter values for one serving and the number of
-  servings eaten. Leave fiber blank when unknown.
+  optional fiber you know. Enter label values and grams for one serving, then
+  the total grams eaten. Without a known weight, use servings eaten. Leave fiber blank when unknown.
 
 These foods are saved only to the selected date in melb.db; they do not become
 rows in the permanent foods list. You can add the same food more than once and
@@ -169,8 +169,8 @@ estimator. Plain foods in generic_foods.json (such as carrot, apple, banana,
 rice, and egg) work offline. All supported reference foods show a typical
 USDA household portion with estimated edible grams, preparation, and a source
 link. Choose a size or household measure, or enter your measured grams.
-The per-serving macros scale automatically; servings eaten multiplies that
-portion once. For example, a medium raw carrot defaults to approximately 61 g,
+The per-serving macros scale automatically, and grams eaten determines how
+much of that portion is included. For example, a medium raw carrot defaults to approximately 61 g,
 an apple to 182 g, and a cup of cooked rice to 158 g. Size words such as
 "large carrot" select a sourced size where available. These are estimates,
 not measurements of your individual food. Packaged-product lookup needs internet access;
@@ -184,12 +184,12 @@ with a retry message. Packaged results are matched against product names and
 brands, rather than words found only in ingredients.
 
 When a product has no usable serving information, its results are explicitly
-shown **per 100 g**, with a required blank weight field. Enter grams to calculate
+shown **per 100 g** as a reference amount. Enter **Grams eaten** to calculate
 the macros for your portion before saving. The app never treats 100 g as one
 bar or item. Packaged label servings keep their label macros and weight when
 available; volume-only servings (such as 250 ml) remain usable without assuming
 milliliters equal grams. Item-count hints prefill only known single-item reference
-portions; check the servings eaten for household measures and packaged labels.
+portions; check the grams eaten for household measures and packaged labels.
 Macro edits remain proportional when you subsequently change size or grams.
 Logged entries keep their final serving label and macro snapshot for that date.
 Reference coverage comes from generic_foods.json; foods without reliable portion
@@ -202,8 +202,9 @@ unknown. Data is attributed to Open Food Facts under
 ## Salt shaker spins
 
 The dashboard estimates spins as Dawg Bowl grams (including configured extra
-salt weight) plus the mass of checked daily logged foods, divided by 23.75
-(one decimal place). This is calibrated from 1,900 g needing 80 spins. Locked
+salt weight) plus the mass of checked daily logged foods, divided by approximately
+20.65 (one decimal place). The original 23.75 g/spin recipe was increased by
+11.1/9.65 (about 15.03%) based on your preferred seasoning amount. Locked
 days retain their saved calibration; older locked days keep the original 29 g/spin. Other permanent categories
 do not contribute. Temporary foods start unchecked; use Include in spins after
 logging them. Their mass is grams per serving times servings eaten, counted once.
@@ -344,14 +345,14 @@ The salt calculator also estimates **salt dispensed** and **sodium from that sal
 using your measured shaker output: **60 spins = 4.5 g salt = 1,769 mg sodium**.
 That is 0.075 g salt and 1,769/60 mg sodium per spin. Estimates use the underlying
 spin calculation before display rounding and update as food amounts change.
-For example, 1,900 g salt weight calls for 80 spins, approximately 6.00 g salt and
-2,359 mg sodium. These figures describe added shaker salt only. They do not
+For example, with the current recipe adjustment, 1,900 g salt weight calls for
+about 92.0 spins, approximately 6.90 g salt and 2,713 mg sodium. These figures describe added shaker salt only. They do not
 change food macros or Apple Health exports. Newly locked days retain these
 dispensing rates; older locked days use this first measured output as a baseline.
 
 When a food result supplies nutrition per 100 g without a label serving,
 **Use this food** fills the editor with a clearly marked **100 g reference amount**.
-Change grams per serving to your portion and the copied macros scale automatically.
+Enter grams eaten to calculate your portion from the copied nutrition.
 The reference is not an estimate of one item or the package's serving size.
 Known label servings and sourced plain-food portions still use their supplied weights.
 
@@ -385,3 +386,34 @@ Label nutrition edits save an automatic backup and preserve food order,
 categories, controls, salt settings, and past/locked-day nutrition. Imports and
 exports include stored and recovered serving metadata. The original notebook
 and its Downloads path are not required on another computer.
+
+The recipe target was adjusted after 11.1 g seasoning tasted better than the
+suggested 9.65 g: recipe demand is multiplied by **11.1/9.65**, about **1.15026**.
+The shaker's measured dispensing rates are still 4.5 g salt and 1,769 mg sodium
+per 60 spins. For the 1,874 g salt-weight example, the adjusted calculator shows
+about **90.8 spins**, **2,676 mg sodium**, and **11.10 g seasoning** at 241 mg
+sodium per 1 g. Previously locked days retain their saved recipe calibration.
+
+### Temporary food portions, edits, and custom history
+
+**Enter macros** now includes **Grams per serving** before saving. Enter the
+nutrition for one serving and its gram weight, then set **Grams eaten**.
+For example, an 84 g serving with 449.4 g eaten records 5.35 servings internally
+while keeping your entered per-serving macros. Existing entries open with their
+total grams eaten. When a serving weight is unknown, the control uses servings
+instead. Changing a manual entry's serving weight keeps its entered macros and
+any grams eaten you have set; lookup-based portions keep
+their existing automatic nutrition scaling.
+
+Each logged temporary food has **Edit** and **Remove** buttons. Edit reopens its
+saved values and **Save changes** updates the same entry and recalculates totals
+and salt spins. Its salt inclusion is preserved. Locked days must be unlocked
+before their entries can change.
+
+**Your custom foods** keeps reusable manually entered food labels, including
+serving grams and macros. It filters as you type in the main food search, or
+you can use its own search. **Use this food** pre-fills a new temporary entry
+with one serving's weight in grams (or one serving if its weight is unknown); it is only logged after you save. Matching names update the
+latest history entry. **Remove from history** removes that reusable entry
+without deleting daily logs. Existing manual foods are recovered into history
+once on upgrade, and removed history entries do not reappear after a restart.
