@@ -417,3 +417,73 @@ with one serving's weight in grams (or one serving if its weight is unknown); it
 latest history entry. **Remove from history** removes that reusable entry
 without deleting daily logs. Existing manual foods are recovered into history
 once on upgrade, and removed history entries do not reappear after a restart.
+
+### Scan a barcode or nutrition label on your phone
+
+In **Add food for this day**, the phone layout has **Scan barcode** and
+**Read nutrition label** buttons. From the app's HTTPS address, tap one and
+allow camera access to open a live rear-camera preview. Keep the whole barcode
+or Nutrition Facts panel in view, upright and without glare. Barcodes capture
+automatically as soon as they decode. Labels capture on the first reading
+with calories, protein, carbs, and fat all readable. Zero values count.
+Serving weight and fiber are optional, and no second matching frame is needed.
+Incomplete readings keep the camera open. The captured frame's OCR result
+fills the review form without another read. Add a name, check the values,
+and save to the day when ready; unclear serving weights and fiber stay blank.
+The label reader starts loading while the camera opens.
+
+
+**Capture now** lets you capture a label that automatic detection cannot read
+confidently. **Use a photo instead** retains the native camera/image-picker
+options. An HTTP address uses photo capture because live browser camera access
+requires HTTPS. Closing, canceling, backgrounding, or completing the scan stops
+the camera. Camera scanning never requests microphone access.
+
+- **Scan barcode** reads the product number and looks it up in Open Food Facts.
+  A match fills the existing editor with the product's serving weight and
+  nutrition. If no complete match is available, use the label reader or enter
+  the macros manually.
+- **Read nutrition label** reads English label text on your phone, then fills
+  any serving weight, calories, protein, carbs, fat, and fiber it can identify.
+  Add the food name, verify every number against the package, fill any blanks,
+  and set grams eaten. Ambiguous multi-column labels are left for manual review.
+  The recognized text is available under **Text read from label**.
+
+Both methods create an unsaved draft. Nothing is added until you press Save.
+The resulting food can be edited normally; manually read labels also enter
+your custom-food history when saved. Locked days must be unlocked first.
+
+Photos are processed in the browser and are not uploaded or saved by the app.
+Only a decoded barcode is sent to the food lookup. Scanner and English OCR
+assets are bundled under `static/vendor/food-scan` and loaded only when needed;
+there is no API key, paid OCR service, or extra Python dependency. The first
+label scan may take longer while the reader loads. Third-party licenses and
+asset versions are included alongside those files.
+
+#### One-time HTTPS setup for automatic scanning
+
+Live browser camera access [requires a secure context](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia).
+Use [Tailscale Serve](https://tailscale.com/docs/features/tailscale-serve) to give
+this app a private HTTPS address:
+
+1. On the PC, right-click **ENABLE_CAMERA_HTTPS.bat** and run as Administrator.
+2. If Tailscale prints an approval link, open it as the Tailscale account owner
+   and enable HTTPS. Follow its certificate acknowledgment, then rerun the
+   helper if necessary.
+3. Open the **Phone address** printed by the helper in Safari, with Tailscale
+   connected on both devices, and allow camera access.
+
+The address looks like `https://your-pc.your-tailnet.ts.net`, without `:8501`.
+Changing the old `http://100.x.x.x:8501` address to HTTPS will not work. Update
+any phone bookmark or home-screen shortcut to use the printed HTTPS address.
+The helper preserves other existing services and refuses conflicting port-443
+configurations. It configures private Serve, without public internet exposure.
+The proxy persists across restarts; the existing MELB app autostart still runs
+the app on port 8501. Run this setup once, rather than after every restart.
+
+The existing HTTP address and [native photo capture](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Attributes/capture)
+remain available when live camera access is unavailable or denied.
+
+Nutrition-label scans use word positions to keep separated calorie numbers on their correct rows and recognize printed zero grams that OCR reads as Og. Check every value before saving; unclear serving weights remain blank rather than guessing digits.
+
+Scanner dependencies live in static/vendor/food-scan so clones serve their own barcode and OCR assets. Full dependency licenses are consolidated in THIRD_PARTY_NOTICES.md; the two adjacent bundle .LICENSE.txt files are retained because the upstream JavaScript references them. asset-manifest.json records versions, runtime file hashes, and the original license sections. There is no npm build step.
