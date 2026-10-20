@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="theme-color" content="#111827">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="theme-color" content="#0b1220">
   <link rel="icon" href="{{ url_for('favicon', v='2') }}" type="image/x-icon" sizes="16x16 32x32 48x48">
   <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32x32.png', v='2') }}">
   <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon-16x16.png', v='2') }}">
@@ -35,7 +35,17 @@
     body { margin:0; font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; font-optical-sizing:auto; background:var(--bg); color:var(--text); }
     button, input, select, textarea, code, pre { font-family:inherit; }
     a { color:inherit; }
-    .wrap { max-width:1300px; margin:auto; padding:16px; }
+    .wrap {
+      max-width:1300px; margin:auto;
+      padding:calc(16px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px))
+        calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));
+    }
+    /* Keep scrolling content out of a translucent status area on older installs. */
+    body::before {
+      content:""; position:fixed; top:0; left:0; right:0;
+      height:env(safe-area-inset-top,0px); background:var(--bg);
+      pointer-events:none; z-index:100;
+    }
     .topbar { display:flex; gap:12px; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
     .brand { font-size:1.35rem; font-weight:800; }
     .nav { display:flex; gap:8px; flex-wrap:wrap; }
@@ -132,6 +142,23 @@
     .panel-title { margin:0; font-size:1.1rem; }
     .food-tabs, .food-actions { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
     .food-tabs [aria-pressed="true"] { border-color:var(--accent); color:var(--accent); }
+    .phone-food-scan { display:none; }
+    .food-scan-actions { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0; }
+    .food-scan-actions .btn { min-height:44px; }
+    .food-scan-status { margin:8px 0; overflow-wrap:anywhere; }
+    .food-live-camera { padding:10px; margin:10px 0; border:1px solid var(--border); border-radius:12px; }
+    .food-live-camera .btn { min-height:44px; }
+    .food-camera-view { position:relative; background:#000; border-radius:8px; overflow:hidden; }
+    .food-camera-view video { display:block; width:100%; max-height:52svh; aspect-ratio:3 / 4; object-fit:contain; }
+    .food-camera-guide { position:absolute; inset:8%; border:2px solid var(--accent); border-radius:10px; pointer-events:none; }
+    .food-scan-photo-options { margin:8px 0; font-size:13px; }
+    .food-scan-photo-options summary { cursor:pointer; padding:8px 0; color:var(--muted); }
+    .food-scan-text { margin:10px 0; font-size:13px; }
+    .food-scan-text summary { cursor:pointer; padding:8px 0; }
+    .food-scan-text pre { max-height:200px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; font:inherit; color:var(--muted); }
+    @media (max-width:600px), (max-width:900px) and (pointer:coarse) {
+      .phone-food-scan { display:block; }
+    }
     .lookup-controls { display:flex; align-items:end; gap:10px; }
     .lookup-controls label { flex:1; }
     .lookup-controls button { flex-shrink:0; }
@@ -290,6 +317,16 @@
       .dashboard-page .day-food-panel, .dashboard-page .health-panel { padding-top:8px; padding-bottom:8px; }
       .dashboard-page .section { padding-top:8px; padding-bottom:8px; }
       .dashboard-page .foodrow { height:clamp(26px,3vh,30px); }
+    }
+    @media (max-width:600px), (max-width:900px) and (pointer:coarse) {
+      .wrap {
+        padding:calc(12px + env(safe-area-inset-top,0px)) max(10px,env(safe-area-inset-right,0px))
+          calc(12px + env(safe-area-inset-bottom,0px)) max(10px,env(safe-area-inset-left,0px));
+      }
+      .topbar { gap:8px; margin-bottom:10px; }
+      .brand { font-size:18px; }
+      .nav { width:100%; gap:6px; }
+      .nav .btn { flex:1; padding:10px 6px; min-height:44px; font-size:12px; text-align:center; }
     }
     .mobile-summary { display:contents; }
     .mobile-food-tabs { display:none; }
@@ -465,7 +502,40 @@
       .food-category-move summary { padding-block:12px; }
       .food-category-move button { min-height:44px; }
       .dashboard-page .mobile-food-tabs { display:flex; overflow-x:auto; }
+      .dashboard-page .mobile-group-tab:first-child { margin-left:auto; }
+      .dashboard-page .mobile-group-tab:last-child { margin-right:auto; }
       .dashboard-page .mobile-group-tab { flex:0 0 auto; min-width:76px; max-width:180px; white-space:normal; overflow-wrap:anywhere; }
+    }
+
+    @media (max-width:600px), (max-width:900px) and (pointer:coarse) {
+      .dashboard-page .dashboard-actions {
+        display:grid; grid-template-columns:repeat(2,minmax(0,1fr));
+        grid-template-areas:"salt salt" "seasoning lock" "health reset";
+        align-items:stretch; gap:6px;
+      }
+      .dashboard-page .dashboard-actions .salt-spin-summary {
+        grid-area:salt; width:auto; justify-content:flex-start; text-align:left;
+        padding:10px; gap:4px 10px;
+      }
+      .dashboard-page .dashboard-actions .salt-spin-summary > span:first-child { flex-basis:100%; }
+      .dashboard-page #seasoningToggle { grid-area:seasoning; }
+      .dashboard-page #dayLockButton { grid-area:lock; }
+      .dashboard-page #healthButton { grid-area:health; }
+      .dashboard-page .dashboard-actions > form { grid-area:reset; margin:0; min-width:0; }
+      .dashboard-page .dashboard-actions .btn {
+        width:100%; min-width:0; height:48px; padding:6px 8px;
+        display:flex; align-items:center; justify-content:center;
+        line-height:16px; white-space:normal;
+      }
+      .dashboard-page .mobile-food-tabs {
+        position:sticky; top:calc(var(--mobile-summary-height,140px) + env(safe-area-inset-top));
+        z-index:19; background:var(--bg); margin:12px 0 0; padding:6px 0;
+        scroll-margin-top:calc(var(--mobile-summary-height,140px) + env(safe-area-inset-top));
+      }
+      .dashboard-page.mobile-typing .mobile-food-tabs { position:static; }
+      .dashboard-page .sections, .dashboard-page .foodrow {
+        scroll-margin-top:calc(var(--mobile-summary-height,140px) + env(safe-area-inset-top) + 64px);
+      }
     }
     .food-category-title, .section h2 { overflow-wrap:anywhere; }
     .food-category-move select { min-width:0; }

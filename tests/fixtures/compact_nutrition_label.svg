@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="313" height="592" viewBox="0 0 313 592">
+<rect width="313" height="592" fill="white"/><rect x="12" y="8" width="292" height="575" fill="white" stroke="black"/>
+<g font-family="Arial, sans-serif" fill="black">
+<text x="17" y="41" font-size="34" font-weight="900" textLength="281" lengthAdjust="spacingAndGlyphs">Nutrition Facts</text>
+<path d="M18 48H298" stroke="black"/>
+<text x="18" y="67" font-size="16">16 servings per container</text>
+<g font-size="17" font-weight="900"><text x="18" y="88">Serving size</text><text x="300" y="88" text-anchor="end">1 Tbsp. (21g)</text></g>
+<rect x="18" y="96" width="280" height="14"/>
+<text x="18" y="126" font-size="11" font-weight="bold">Amount per serving</text>
+<text x="18" y="154" font-size="29" font-weight="900">Calories</text><text x="299" y="154" text-anchor="end" font-size="38" font-weight="900">60</text>
+<path d="M18 166H298" stroke="black" stroke-width="5"/>
+<text x="298" y="184" text-anchor="end" font-size="11" font-weight="bold">% Daily Value*</text>
+<g stroke="#555" stroke-width=".7"><path d="M18 190H298M18 212H298M18 234H298M18 255H298M18 276H298M18 297H298M18 318H298M18 340H298M18 362H298M18 383H298"/></g>
+<g font-size="14"><text x="18" y="206"><tspan font-weight="bold">Total Fat</tspan> 0g</text><text x="298" y="206" text-anchor="end" font-weight="bold">0%</text>
+<text x="38" y="228">Saturated Fat 0g</text><text x="298" y="228" text-anchor="end" font-weight="bold">0%</text>
+<text x="38" y="249">Trans Fat 0g</text>
+<text x="18" y="270"><tspan font-weight="bold">Cholesterol</tspan> 0mg</text><text x="298" y="270" text-anchor="end" font-weight="bold">0%</text>
+<text x="18" y="291"><tspan font-weight="bold">Sodium</tspan> 0mg</text><text x="298" y="291" text-anchor="end" font-weight="bold">0%</text>
+<text x="18" y="313"><tspan font-weight="bold">Total Carbohydrate</tspan> 17g</text><text x="298" y="313" text-anchor="end" font-weight="bold">6%</text>
+<text x="38" y="334">Dietary Fiber 0g</text><text x="298" y="334" text-anchor="end" font-weight="bold">0%</text>
+<text x="38" y="355">Total Sugars 17g</text><text x="298" y="378" text-anchor="end" font-weight="bold">34%*</text>
+<text x="18" y="400"><tspan font-weight="bold">Protein</tspan> 0g</text></g>
+<rect x="18" y="405" width="280" height="13"/>
+<g font-size="14"><text x="18" y="434">Vitamin D 0mcg</text><text x="298" y="434" text-anchor="end">0%</text>
+<text x="18" y="455">Calcium 0mg</text><text x="298" y="455" text-anchor="end">0%</text>
+<text x="18" y="476">Iron 0mg</text><text x="298" y="476" text-anchor="end">0%</text>
+<text x="18" y="497">Potassium 0mg</text><text x="298" y="497" text-anchor="end">0%</text></g>
+<g stroke="#555" stroke-width=".7"><path d="M18 439H298M18 460H298M18 481H298"/></g>
+<path d="M18 507H298" stroke="black" stroke-width="5"/>
+<g font-size="10"><text x="18" y="520">* The % Daily Value tells you how much a nutrient</text><text x="26" y="532">in a serving of food contributes to a daily diet.</text><text x="26" y="544">2,000 calories a day is used for general nutrition advice.</text><text x="18" y="556">One serving adds 17g of sugar to your diet and</text><text x="18" y="568">represents 34% of the Daily Value for Added Sugars.</text></g>
+</g></svg>

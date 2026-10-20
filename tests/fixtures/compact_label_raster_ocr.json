@@ -1,0 +1,1165 @@
+{
+  "source": "compact_nutrition_label.svg rasterized at 313x592 then upscaled",
+  "cases": [
+    {
+      "scale": 3,
+      "psm": 11,
+      "text": "Nutrition Facts\n\n16 servings per container\n\nServing size\n\n1 Thsp. (219)\n\nEE\n\nAmount per serving\n\nCalories\n\n60\n\n% Daily Value*\n\nTotal Fat Og\n\n0%\n\nSaturated Fat 0g\n\n0%\n\nTrans Fat Og\n\n0%\n\nCholesterol Omg\n\nSodium Omg\n\n0%\n\nTotal Carbohydrate 17g\n\n6%\n\nDietary Fiber 0g\n\n0%\n\nTotal Sugars 17g\n\n34%\"\n\nProtein Og\n\nVitamin D Omcg\n\n0%\n\n0%\n\nCalcium Omg\n\nIron Omg\n\n0%\n\nPotassium Omg\n\n0%\n\n* The % Daily Value tells you how much a nutrient\n\nin a serving of food contributes to a daily diet.\n\n2.000 calories a day is used for general nutrition advice.\n\nOne serving adds 17g of sugar to your diet and\n\nrepresents 34% of the Daily Value for Added Sugars.\n",
+      "confidence": 91,
+      "words": [
+        {
+          "text": "Nutrition",
+          "confidence": 96,
+          "bbox": {
+            "x0": 58,
+            "y0": 48,
+            "x1": 542,
+            "y1": 123
+          }
+        },
+        {
+          "text": "Facts",
+          "confidence": 96,
+          "bbox": {
+            "x0": 589,
+            "y0": 48,
+            "x1": 890,
+            "y1": 123
+          }
+        },
+        {
+          "text": "16",
+          "confidence": 96,
+          "bbox": {
+            "x0": 59,
+            "y0": 165,
+            "x1": 106,
+            "y1": 201
+          }
+        },
+        {
+          "text": "servings",
+          "confidence": 95,
+          "bbox": {
+            "x0": 123,
+            "y0": 165,
+            "x1": 298,
+            "y1": 210
+          }
+        },
+        {
+          "text": "per",
+          "confidence": 95,
+          "bbox": {
+            "x0": 316,
+            "y0": 174,
+            "x1": 382,
+            "y1": 210
+          }
+        },
+        {
+          "text": "container",
+          "confidence": 96,
+          "bbox": {
+            "x0": 397,
+            "y0": 165,
+            "x1": 594,
+            "y1": 201
+          }
+        },
+        {
+          "text": "Serving",
+          "confidence": 95,
+          "bbox": {
+            "x0": 56,
+            "y0": 228,
+            "x1": 264,
+            "y1": 273
+          }
+        },
+        {
+          "text": "size",
+          "confidence": 96,
+          "bbox": {
+            "x0": 285,
+            "y0": 228,
+            "x1": 393,
+            "y1": 264
+          }
+        },
+        {
+          "text": "1",
+          "confidence": 93,
+          "bbox": {
+            "x0": 542,
+            "y0": 228,
+            "x1": 564,
+            "y1": 264
+          }
+        },
+        {
+          "text": "Thsp.",
+          "confidence": 76,
+          "bbox": {
+            "x0": 590,
+            "y0": 228,
+            "x1": 739,
+            "y1": 273
+          }
+        },
+        {
+          "text": "(219)",
+          "confidence": 82,
+          "bbox": {
+            "x0": 761,
+            "y0": 228,
+            "x1": 898,
+            "y1": 273
+          }
+        },
+        {
+          "text": "EE",
+          "confidence": 37,
+          "bbox": {
+            "x0": 54,
+            "y0": 288,
+            "x1": 894,
+            "y1": 330
+          }
+        },
+        {
+          "text": "Amount",
+          "confidence": 95,
+          "bbox": {
+            "x0": 54,
+            "y0": 354,
+            "x1": 180,
+            "y1": 378
+          }
+        },
+        {
+          "text": "per",
+          "confidence": 95,
+          "bbox": {
+            "x0": 189,
+            "y0": 360,
+            "x1": 240,
+            "y1": 384
+          }
+        },
+        {
+          "text": "serving",
+          "confidence": 96,
+          "bbox": {
+            "x0": 250,
+            "y0": 354,
+            "x1": 364,
+            "y1": 384
+          }
+        },
+        {
+          "text": "Calories",
+          "confidence": 96,
+          "bbox": {
+            "x0": 58,
+            "y0": 399,
+            "x1": 443,
+            "y1": 462
+          }
+        },
+        {
+          "text": "60",
+          "confidence": 96,
+          "bbox": {
+            "x0": 750,
+            "y0": 378,
+            "x1": 894,
+            "y1": 462
+          }
+        },
+        {
+          "text": "%",
+          "confidence": 93,
+          "bbox": {
+            "x0": 670,
+            "y0": 528,
+            "x1": 696,
+            "y1": 552
+          }
+        },
+        {
+          "text": "Daily",
+          "confidence": 93,
+          "bbox": {
+            "x0": 709,
+            "y0": 528,
+            "x1": 785,
+            "y1": 558
+          }
+        },
+        {
+          "text": "Value*",
+          "confidence": 92,
+          "bbox": {
+            "x0": 795,
+            "y0": 528,
+            "x1": 894,
+            "y1": 552
+          }
+        },
+        {
+          "text": "Total",
+          "confidence": 96,
+          "bbox": {
+            "x0": 57,
+            "y0": 588,
+            "x1": 149,
+            "y1": 618
+          }
+        },
+        {
+          "text": "Fat",
+          "confidence": 95,
+          "bbox": {
+            "x0": 166,
+            "y0": 588,
+            "x1": 227,
+            "y1": 618
+          }
+        },
+        {
+          "text": "Og",
+          "confidence": 81,
+          "bbox": {
+            "x0": 240,
+            "y0": 588,
+            "x1": 282,
+            "y1": 627
+          }
+        },
+        {
+          "text": "0%",
+          "confidence": 95,
+          "bbox": {
+            "x0": 835,
+            "y0": 588,
+            "x1": 892,
+            "y1": 618
+          }
+        },
+        {
+          "text": "Saturated",
+          "confidence": 95,
+          "bbox": {
+            "x0": 116,
+            "y0": 654,
+            "x1": 294,
+            "y1": 684
+          }
+        },
+        {
+          "text": "Fat",
+          "confidence": 95,
+          "bbox": {
+            "x0": 311,
+            "y0": 654,
+            "x1": 369,
+            "y1": 684
+          }
+        },
+        {
+          "text": "0g",
+          "confidence": 75,
+          "bbox": {
+            "x0": 382,
+            "y0": 654,
+            "x1": 424,
+            "y1": 693
+          }
+        },
+        {
+          "text": "0%",
+          "confidence": 95,
+          "bbox": {
+            "x0": 835,
+            "y0": 654,
+            "x1": 892,
+            "y1": 684
+          }
+        },
+        {
+          "text": "Trans",
+          "confidence": 96,
+          "bbox": {
+            "x0": 115,
+            "y0": 717,
+            "x1": 219,
+            "y1": 747
+          }
+        },
+        {
+          "text": "Fat",
+          "confidence": 96,
+          "bbox": {
+            "x0": 235,
+            "y0": 717,
+            "x1": 292,
+            "y1": 747
+          }
+        },
+        {
+          "text": "Og",
+          "confidence": 82,
+          "bbox": {
+            "x0": 306,
+            "y0": 717,
+            "x1": 348,
+            "y1": 756
+          }
+        },
+        {
+          "text": "0%",
+          "confidence": 95,
+          "bbox": {
+            "x0": 835,
+            "y0": 780,
+            "x1": 892,
+            "y1": 810
+          }
+        },
+        {
+          "text": "Cholesterol",
+          "confidence": 95,
+          "bbox": {
+            "x0": 56,
+            "y0": 780,
+            "x1": 282,
+            "y1": 810
+          }
+        },
+        {
+          "text": "Omg",
+          "confidence": 46,
+          "bbox": {
+            "x0": 299,
+            "y0": 780,
+            "x1": 376,
+            "y1": 819
+          }
+        },
+        {
+          "text": "Sodium",
+          "confidence": 96,
+          "bbox": {
+            "x0": 59,
+            "y0": 843,
+            "x1": 206,
+            "y1": 873
+          }
+        },
+        {
+          "text": "Omg",
+          "confidence": 66,
+          "bbox": {
+            "x0": 222,
+            "y0": 843,
+            "x1": 300,
+            "y1": 882
+          }
+        },
+        {
+          "text": "0%",
+          "confidence": 95,
+          "bbox": {
+            "x0": 835,
+            "y0": 843,
+            "x1": 892,
+            "y1": 873
+          }
+        },
+        {
+          "text": "Total",
+          "confidence": 96,
+          "bbox": {
+            "x0": 57,
+            "y0": 909,
+            "x1": 149,
+            "y1": 939
+          }
+        },
+        {
+          "text": "Carbohydrate",
+          "confidence": 96,
+          "bbox": {
+            "x0": 165,
+            "y0": 909,
+            "x1": 435,
+            "y1": 948
+          }
+        },
+        {
+          "text": "17g",
+          "confidence": 95,
+          "bbox": {
+            "x0": 452,
+            "y0": 909,
+            "x1": 516,
+            "y1": 948
+          }
+        },
+        {
+          "text": "6%",
+          "confidence": 95,
+          "bbox": {
+            "x0": 835,
+            "y0": 909,
+            "x1": 892,
+            "y1": 939
+          }
+        },
+        {
+          "text": "Dietary",
+          "confidence": 96,
+          "bbox": {
+            "x0": 117,
+            "y0": 972,
+            "x1": 246,
+            "y1": 1011
+          }
+        },
+        {
+          "text": "Fiber",
+          "confidence": 96,
+          "bbox": {
+            "x0": 262,
+            "y0": 972,
+            "x1": 355,
+            "y1": 1002
+          }
+        },
+        {
+          "text": "0g",
+          "confidence": 71,
+          "bbox": {
+            "x0": 368,
+            "y0": 972,
+            "x1": 411,
+            "y1": 1011
+          }
+        },
+        {
+          "text": "0%",
+          "confidence": 95,
+          "bbox": {
+            "x0": 835,
+            "y0": 972,
+            "x1": 892,
+            "y1": 1002
+          }
+        },
+        {
+          "text": "Total",
+          "confidence": 96,
+          "bbox": {
+            "x0": 115,
+            "y0": 1035,
+            "x1": 201,
+            "y1": 1065
+          }
+        },
+        {
+          "text": "Sugars",
+          "confidence": 96,
+          "bbox": {
+            "x0": 216,
+            "y0": 1035,
+            "x1": 346,
+            "y1": 1074
+          }
+        },
+        {
+          "text": "17g",
+          "confidence": 95,
+          "bbox": {
+            "x0": 364,
+            "y0": 1035,
+            "x1": 427,
+            "y1": 1074
+          }
+        },
+        {
+          "text": "34%\"",
+          "confidence": 4,
+          "bbox": {
+            "x0": 795,
+            "y0": 1104,
+            "x1": 892,
+            "y1": 1134
+          }
+        },
+        {
+          "text": "Protein",
+          "confidence": 96,
+          "bbox": {
+            "x0": 57,
+            "y0": 1170,
+            "x1": 196,
+            "y1": 1200
+          }
+        },
+        {
+          "text": "Og",
+          "confidence": 86,
+          "bbox": {
+            "x0": 212,
+            "y0": 1170,
+            "x1": 255,
+            "y1": 1209
+          }
+        },
+        {
+          "text": "Vitamin",
+          "confidence": 93,
+          "bbox": {
+            "x0": 54,
+            "y0": 1272,
+            "x1": 192,
+            "y1": 1302
+          }
+        },
+        {
+          "text": "D",
+          "confidence": 92,
+          "bbox": {
+            "x0": 208,
+            "y0": 1272,
+            "x1": 234,
+            "y1": 1302
+          }
+        },
+        {
+          "text": "Omcg",
+          "confidence": 88,
+          "bbox": {
+            "x0": 249,
+            "y0": 1272,
+            "x1": 348,
+            "y1": 1311
+          }
+        },
+        {
+          "text": "0%",
+          "confidence": 96,
+          "bbox": {
+            "x0": 835,
+            "y0": 1272,
+            "x1": 891,
+            "y1": 1302
+          }
+        },
+        {
+          "text": "0%",
+          "confidence": 96,
+          "bbox": {
+            "x0": 835,
+            "y0": 1335,
+            "x1": 891,
+            "y1": 1365
+          }
+        },
+        {
+          "text": "Calcium",
+          "confidence": 95,
+          "bbox": {
+            "x0": 56,
+            "y0": 1335,
+            "x1": 204,
+            "y1": 1365
+          }
+        },
+        {
+          "text": "Omg",
+          "confidence": 85,
+          "bbox": {
+            "x0": 219,
+            "y0": 1335,
+            "x1": 297,
+            "y1": 1374
+          }
+        },
+        {
+          "text": "Iron",
+          "confidence": 94,
+          "bbox": {
+            "x0": 57,
+            "y0": 1398,
+            "x1": 124,
+            "y1": 1428
+          }
+        },
+        {
+          "text": "Omg",
+          "confidence": 91,
+          "bbox": {
+            "x0": 140,
+            "y0": 1398,
+            "x1": 217,
+            "y1": 1437
+          }
+        },
+        {
+          "text": "0%",
+          "confidence": 96,
+          "bbox": {
+            "x0": 835,
+            "y0": 1398,
+            "x1": 891,
+            "y1": 1428
+          }
+        },
+        {
+          "text": "Potassium",
+          "confidence": 96,
+          "bbox": {
+            "x0": 57,
+            "y0": 1461,
+            "x1": 249,
+            "y1": 1491
+          }
+        },
+        {
+          "text": "Omg",
+          "confidence": 74,
+          "bbox": {
+            "x0": 264,
+            "y0": 1461,
+            "x1": 342,
+            "y1": 1500
+          }
+        },
+        {
+          "text": "0%",
+          "confidence": 95,
+          "bbox": {
+            "x0": 835,
+            "y0": 1461,
+            "x1": 891,
+            "y1": 1491
+          }
+        },
+        {
+          "text": "*",
+          "confidence": 90,
+          "bbox": {
+            "x0": 55,
+            "y0": 1541,
+            "x1": 65,
+            "y1": 1548
+          }
+        },
+        {
+          "text": "The",
+          "confidence": 93,
+          "bbox": {
+            "x0": 74,
+            "y0": 1539,
+            "x1": 125,
+            "y1": 1560
+          }
+        },
+        {
+          "text": "%",
+          "confidence": 93,
+          "bbox": {
+            "x0": 136,
+            "y0": 1539,
+            "x1": 158,
+            "y1": 1560
+          }
+        },
+        {
+          "text": "Daily",
+          "confidence": 96,
+          "bbox": {
+            "x0": 171,
+            "y0": 1539,
+            "x1": 234,
+            "y1": 1566
+          }
+        },
+        {
+          "text": "Value",
+          "confidence": 88,
+          "bbox": {
+            "x0": 244,
+            "y0": 1539,
+            "x1": 318,
+            "y1": 1560
+          }
+        },
+        {
+          "text": "tells",
+          "confidence": 95,
+          "bbox": {
+            "x0": 327,
+            "y0": 1540,
+            "x1": 378,
+            "y1": 1560
+          }
+        },
+        {
+          "text": "you",
+          "confidence": 95,
+          "bbox": {
+            "x0": 390,
+            "y0": 1545,
+            "x1": 435,
+            "y1": 1566
+          }
+        },
+        {
+          "text": "how",
+          "confidence": 96,
+          "bbox": {
+            "x0": 447,
+            "y0": 1540,
+            "x1": 500,
+            "y1": 1560
+          }
+        },
+        {
+          "text": "much",
+          "confidence": 96,
+          "bbox": {
+            "x0": 510,
+            "y0": 1540,
+            "x1": 579,
+            "y1": 1560
+          }
+        },
+        {
+          "text": "a",
+          "confidence": 96,
+          "bbox": {
+            "x0": 591,
+            "y0": 1545,
+            "x1": 605,
+            "y1": 1560
+          }
+        },
+        {
+          "text": "nutrient",
+          "confidence": 96,
+          "bbox": {
+            "x0": 617,
+            "y0": 1540,
+            "x1": 715,
+            "y1": 1560
+          }
+        },
+        {
+          "text": "in",
+          "confidence": 95,
+          "bbox": {
+            "x0": 82,
+            "y0": 1581,
+            "x1": 99,
+            "y1": 1596
+          }
+        },
+        {
+          "text": "a",
+          "confidence": 88,
+          "bbox": {
+            "x0": 111,
+            "y0": 1581,
+            "x1": 125,
+            "y1": 1596
+          }
+        },
+        {
+          "text": "serving",
+          "confidence": 96,
+          "bbox": {
+            "x0": 136,
+            "y0": 1581,
+            "x1": 229,
+            "y1": 1602
+          }
+        },
+        {
+          "text": "of",
+          "confidence": 96,
+          "bbox": {
+            "x0": 241,
+            "y0": 1575,
+            "x1": 267,
+            "y1": 1596
+          }
+        },
+        {
+          "text": "food",
+          "confidence": 95,
+          "bbox": {
+            "x0": 273,
+            "y0": 1575,
+            "x1": 330,
+            "y1": 1596
+          }
+        },
+        {
+          "text": "contributes",
+          "confidence": 96,
+          "bbox": {
+            "x0": 342,
+            "y0": 1576,
+            "x1": 486,
+            "y1": 1596
+          }
+        },
+        {
+          "text": "to",
+          "confidence": 92,
+          "bbox": {
+            "x0": 495,
+            "y0": 1577,
+            "x1": 519,
+            "y1": 1596
+          }
+        },
+        {
+          "text": "a",
+          "confidence": 72,
+          "bbox": {
+            "x0": 529,
+            "y0": 1581,
+            "x1": 543,
+            "y1": 1596
+          }
+        },
+        {
+          "text": "daily",
+          "confidence": 95,
+          "bbox": {
+            "x0": 555,
+            "y0": 1576,
+            "x1": 615,
+            "y1": 1602
+          }
+        },
+        {
+          "text": "diet.",
+          "confidence": 93,
+          "bbox": {
+            "x0": 624,
+            "y0": 1576,
+            "x1": 678,
+            "y1": 1596
+          }
+        },
+        {
+          "text": "2.000",
+          "confidence": 72,
+          "bbox": {
+            "x0": 79,
+            "y0": 1611,
+            "x1": 153,
+            "y1": 1633
+          }
+        },
+        {
+          "text": "calories",
+          "confidence": 95,
+          "bbox": {
+            "x0": 163,
+            "y0": 1612,
+            "x1": 264,
+            "y1": 1632
+          }
+        },
+        {
+          "text": "a",
+          "confidence": 95,
+          "bbox": {
+            "x0": 274,
+            "y0": 1617,
+            "x1": 288,
+            "y1": 1632
+          }
+        },
+        {
+          "text": "day",
+          "confidence": 96,
+          "bbox": {
+            "x0": 300,
+            "y0": 1612,
+            "x1": 345,
+            "y1": 1638
+          }
+        },
+        {
+          "text": "is",
+          "confidence": 95,
+          "bbox": {
+            "x0": 357,
+            "y0": 1612,
+            "x1": 375,
+            "y1": 1632
+          }
+        },
+        {
+          "text": "used",
+          "confidence": 95,
+          "bbox": {
+            "x0": 387,
+            "y0": 1612,
+            "x1": 448,
+            "y1": 1632
+          }
+        },
+        {
+          "text": "for",
+          "confidence": 95,
+          "bbox": {
+            "x0": 459,
+            "y0": 1611,
+            "x1": 493,
+            "y1": 1632
+          }
+        },
+        {
+          "text": "general",
+          "confidence": 96,
+          "bbox": {
+            "x0": 504,
+            "y0": 1612,
+            "x1": 600,
+            "y1": 1638
+          }
+        },
+        {
+          "text": "nutrition",
+          "confidence": 91,
+          "bbox": {
+            "x0": 612,
+            "y0": 1612,
+            "x1": 714,
+            "y1": 1632
+          }
+        },
+        {
+          "text": "advice.",
+          "confidence": 95,
+          "bbox": {
+            "x0": 727,
+            "y0": 1612,
+            "x1": 817,
+            "y1": 1632
+          }
+        },
+        {
+          "text": "One",
+          "confidence": 95,
+          "bbox": {
+            "x0": 57,
+            "y0": 1647,
+            "x1": 110,
+            "y1": 1668
+          }
+        },
+        {
+          "text": "serving",
+          "confidence": 95,
+          "bbox": {
+            "x0": 121,
+            "y0": 1648,
+            "x1": 214,
+            "y1": 1674
+          }
+        },
+        {
+          "text": "adds",
+          "confidence": 96,
+          "bbox": {
+            "x0": 226,
+            "y0": 1648,
+            "x1": 288,
+            "y1": 1668
+          }
+        },
+        {
+          "text": "17g",
+          "confidence": 96,
+          "bbox": {
+            "x0": 303,
+            "y0": 1647,
+            "x1": 346,
+            "y1": 1674
+          }
+        },
+        {
+          "text": "of",
+          "confidence": 96,
+          "bbox": {
+            "x0": 357,
+            "y0": 1647,
+            "x1": 383,
+            "y1": 1668
+          }
+        },
+        {
+          "text": "sugar",
+          "confidence": 96,
+          "bbox": {
+            "x0": 391,
+            "y0": 1653,
+            "x1": 465,
+            "y1": 1674
+          }
+        },
+        {
+          "text": "to",
+          "confidence": 96,
+          "bbox": {
+            "x0": 473,
+            "y0": 1650,
+            "x1": 497,
+            "y1": 1668
+          }
+        },
+        {
+          "text": "your",
+          "confidence": 96,
+          "bbox": {
+            "x0": 507,
+            "y0": 1653,
+            "x1": 565,
+            "y1": 1674
+          }
+        },
+        {
+          "text": "diet",
+          "confidence": 94,
+          "bbox": {
+            "x0": 574,
+            "y0": 1648,
+            "x1": 621,
+            "y1": 1668
+          }
+        },
+        {
+          "text": "and",
+          "confidence": 96,
+          "bbox": {
+            "x0": 631,
+            "y0": 1648,
+            "x1": 678,
+            "y1": 1668
+          }
+        },
+        {
+          "text": "represents",
+          "confidence": 95,
+          "bbox": {
+            "x0": 56,
+            "y0": 1686,
+            "x1": 195,
+            "y1": 1709
+          }
+        },
+        {
+          "text": "34%",
+          "confidence": 86,
+          "bbox": {
+            "x0": 205,
+            "y0": 1683,
+            "x1": 263,
+            "y1": 1704
+          }
+        },
+        {
+          "text": "of",
+          "confidence": 96,
+          "bbox": {
+            "x0": 274,
+            "y0": 1683,
+            "x1": 300,
+            "y1": 1704
+          }
+        },
+        {
+          "text": "the",
+          "confidence": 95,
+          "bbox": {
+            "x0": 306,
+            "y0": 1684,
+            "x1": 347,
+            "y1": 1704
+          }
+        },
+        {
+          "text": "Daily",
+          "confidence": 96,
+          "bbox": {
+            "x0": 358,
+            "y0": 1683,
+            "x1": 422,
+            "y1": 1710
+          }
+        },
+        {
+          "text": "Value",
+          "confidence": 94,
+          "bbox": {
+            "x0": 432,
+            "y0": 1683,
+            "x1": 505,
+            "y1": 1704
+          }
+        },
+        {
+          "text": "for",
+          "confidence": 96,
+          "bbox": {
+            "x0": 514,
+            "y0": 1683,
+            "x1": 549,
+            "y1": 1704
+          }
+        },
+        {
+          "text": "Added",
+          "confidence": 96,
+          "bbox": {
+            "x0": 556,
+            "y0": 1683,
+            "x1": 640,
+            "y1": 1704
+          }
+        },
+        {
+          "text": "Sugars.",
+          "confidence": 95,
+          "bbox": {
+            "x0": 652,
+            "y0": 1683,
+            "x1": 751,
+            "y1": 1710
+          }
+        }
+      ],
+      "parsed": {
+        "serving_g": null,
+        "serving_label": "1 Thsp. (219)",
+        "calories": 60,
+        "protein": 0,
+        "carbs": 17,
+        "fat": 0,
+        "fiber": 0,
+        "warnings": [
+          "No reliable serving weight in grams was found. Enter it if you know it."
+        ]
+      }
+    }
+  ]
+}

@@ -41,7 +41,7 @@ groupButtons.forEach(button => button.addEventListener("click", () => {
   if (phoneLayout.matches && document.activeElement?.matches("input, textarea")) document.activeElement.blur();
   selectedCategory = button.dataset.category;
   syncMobileCategories();
-  if (phoneLayout.matches) document.getElementById("foodSections").scrollIntoView({block:"start"});
+  if (phoneLayout.matches) document.getElementById("mobileFoodTabs").scrollIntoView({block:"start"});
 }));
 setPanelLayout();
 syncMobileCategories();

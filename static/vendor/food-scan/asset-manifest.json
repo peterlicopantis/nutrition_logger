@@ -1,0 +1,301 @@
+{
+  "packages": {
+    "@zxing/browser": {
+      "version": "0.2.1",
+      "metadata_url": "https://registry.npmjs.org/@zxing/browser/0.2.1",
+      "tarball": "https://registry.npmjs.org/@zxing/browser/-/browser-0.2.1.tgz",
+      "integrity": "sha512-92pVfVDUXbc15xu9vIEmhNyqIEASMEkDF92CwT6T+7sg2EHXJRktH9CQKoQSXe51UtbNsj+Fm09H/JBWHMs/Sw==",
+      "license": "MIT"
+    },
+    "tesseract.js": {
+      "version": "7.0.0",
+      "metadata_url": "https://registry.npmjs.org/tesseract.js/7.0.0",
+      "tarball": "https://registry.npmjs.org/tesseract.js/-/tesseract.js-7.0.0.tgz",
+      "integrity": "sha512-exPBkd+z+wM1BuMkx/Bjv43OeLBxhL5kKWsz/9JY+DXcXdiBjiAch0V49QR3oAJqCaL5qURE0vx9Eo+G5YE7mA==",
+      "license": "Apache-2.0"
+    },
+    "tesseract.js-core": {
+      "version": "7.0.0",
+      "metadata_url": "https://registry.npmjs.org/tesseract.js-core/7.0.0",
+      "tarball": "https://registry.npmjs.org/tesseract.js-core/-/tesseract.js-core-7.0.0.tgz",
+      "integrity": "sha512-WnNH518NzmbSq9zgTPeoF8c+xmilS8rFIl1YKbk/ptuuc7p6cLNELNuPAzcmsYw450ca6bLa8j3t0VAtq435Vw==",
+      "license": "Apache-2.0"
+    },
+    "@tesseract.js-data/eng": {
+      "version": "1.0.0",
+      "metadata_url": "https://registry.npmjs.org/@tesseract.js-data/eng/1.0.0",
+      "tarball": "https://registry.npmjs.org/@tesseract.js-data/eng/-/eng-1.0.0.tgz",
+      "integrity": "sha512-mbTumm6KQPUHyzTPQaF3ObXYnx0SqqfV2nabqFVQBwD6Kl7PhGSLSzOlfFTWy0P3BjghaSKA2W9GB19Jk+ZcTg==",
+      "license": "MIT"
+    },
+    "@zxing/library": {
+      "version": "0.23.0",
+      "metadata_url": "https://registry.npmjs.org/@zxing/library/0.23.0",
+      "tarball": "https://registry.npmjs.org/@zxing/library/-/library-0.23.0.tgz",
+      "integrity": "sha512-6fkkoFwP8CHxl6ugnPsj74PLJgX2iRv5zczGAyt5OBzQgxFhuhF0NCEc4t4OvSr8xAv2MRLlI0Iu9ZGDZQ2urA==",
+      "license": "Apache-2.0"
+    }
+  },
+  "files": {
+    "zxing-browser.min.js": {
+      "sha256": "066bc34edfcdd4a33f0964aeec967752a0dea1ccaf36e58e319ac9fcb5070f6a",
+      "bytes": 441121,
+      "package": "@zxing/browser",
+      "source_path": "umd/zxing-browser.min.js"
+    },
+    "tesseract.min.js": {
+      "sha256": "000c27d9cd0def655f77b36c72a389c0ab13793aa31cb4d7aab56d09c0afbc7e",
+      "bytes": 62961,
+      "package": "tesseract.js",
+      "source_path": "dist/tesseract.min.js"
+    },
+    "worker.min.js": {
+      "sha256": "576b7df7e3393e137e51849357c9adb53fe7ac1bb69bfa06cf3d61520f182c6d",
+      "bytes": 111307,
+      "package": "tesseract.js",
+      "source_path": "dist/worker.min.js"
+    },
+    "tesseract.min.js.LICENSE.txt": {
+      "sha256": "cdf963ced7d25a0f98901a547647b4d6e2dbe0197fd78c87a059a87b0e542fe2",
+      "bytes": 149,
+      "package": "tesseract.js",
+      "source_path": "dist/tesseract.min.js.LICENSE.txt"
+    },
+    "worker.min.js.LICENSE.txt": {
+      "sha256": "45f54171aeaa1d10c0c1a66f374b7bba1f02472b1487fbe892eec04f840002ac",
+      "bytes": 466,
+      "package": "tesseract.js",
+      "source_path": "dist/worker.min.js.LICENSE.txt"
+    },
+    "core/tesseract-core-lstm.wasm.js": {
+      "sha256": "eef5f8b2f8e20e150680b20adaec4a60babafee3adbe8a94583c81fee46e8680",
+      "bytes": 3896484,
+      "package": "tesseract.js-core",
+      "source_path": "tesseract-core-lstm.wasm.js"
+    },
+    "core/tesseract-core-simd-lstm.wasm.js": {
+      "sha256": "c58b46a4c796c0b8afccf77591d5b875b6896b45d402bbce8caa6f5362447b38",
+      "bytes": 3899472,
+      "package": "tesseract.js-core",
+      "source_path": "tesseract-core-simd-lstm.wasm.js"
+    },
+    "core/tesseract-core-relaxedsimd-lstm.wasm.js": {
+      "sha256": "861a536cf9ef8e63cb644d57bab39c388f37f7d6b6f60024b741c5f6b39a59b3",
+      "bytes": 3905767,
+      "package": "tesseract.js-core",
+      "source_path": "tesseract-core-relaxedsimd-lstm.wasm.js"
+    },
+    "lang/eng.traineddata.gz": {
+      "sha256": "45b4cb346724ac1774f1c36f42f182b887bcdb28ebe63e6fff90ac41f3fcff91",
+      "bytes": 2952873,
+      "package": "@tesseract.js-data/eng",
+      "source_path": "4.0.0_best_int/eng.traineddata.gz"
+    },
+    "THIRD_PARTY_NOTICES.md": {
+      "sha256": "e610fa3bfd910ca7c90c068327c223b66e605f6e468e3f3145420d7424904f78",
+      "bytes": 82644,
+      "description": "Consolidated full license texts and notices; original sources are indexed below."
+    }
+  },
+  "bundled_notice_sources": {
+    "base64-js": {
+      "version": "1.5.1",
+      "metadata_url": "https://registry.npmjs.org/base64-js/1.5.1",
+      "tarball": "https://registry.npmjs.org/base64-js/-/base64-js-1.5.1.tgz",
+      "integrity": "sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA==",
+      "license": "MIT"
+    },
+    "bmp-js": {
+      "version": "0.1.0",
+      "metadata_url": "https://registry.npmjs.org/bmp-js/0.1.0",
+      "tarball": "https://registry.npmjs.org/bmp-js/-/bmp-js-0.1.0.tgz",
+      "integrity": "sha512-vHdS19CnY3hwiNdkaqk93DvjVLfbEcI8mys4UjuWrlX1haDmroo8o4xCzh4wD6DGV6HxRCyauwhHRqMTfERtjw==",
+      "license": "MIT"
+    },
+    "buffer": {
+      "version": "6.0.3",
+      "metadata_url": "https://registry.npmjs.org/buffer/6.0.3",
+      "tarball": "https://registry.npmjs.org/buffer/-/buffer-6.0.3.tgz",
+      "integrity": "sha512-FTiCpNxtwiZZHEZbcbTIcZjERVICn9yq/pDFkTl95/AxzD1naBctN7YO68riM/gLSDY7sdrMby8hofADYuuqOA==",
+      "license": "MIT"
+    },
+    "idb-keyval": {
+      "version": "6.2.0",
+      "metadata_url": "https://registry.npmjs.org/idb-keyval/6.2.0",
+      "tarball": "https://registry.npmjs.org/idb-keyval/-/idb-keyval-6.2.0.tgz",
+      "integrity": "sha512-uw+MIyQn2jl3+hroD7hF8J7PUviBU7BPKWw4f/ISf32D4LoGu98yHjrzWWJDASu9QNrX10tCJqk9YY0ClWm8Ng==",
+      "license": "Apache-2.0"
+    },
+    "ieee754": {
+      "version": "1.2.1",
+      "metadata_url": "https://registry.npmjs.org/ieee754/1.2.1",
+      "tarball": "https://registry.npmjs.org/ieee754/-/ieee754-1.2.1.tgz",
+      "integrity": "sha512-dcyqhDvX1C46lXZcVqCpK+FtMRQVdIMN6/Df5js2zouUsqG7I6sFxitIC+7KYK29KdXOLHdu9zL4sFnoVQnqaA==",
+      "license": "BSD-3-Clause"
+    },
+    "is-url": {
+      "version": "1.2.4",
+      "metadata_url": "https://registry.npmjs.org/is-url/1.2.4",
+      "tarball": "https://registry.npmjs.org/is-url/-/is-url-1.2.4.tgz",
+      "integrity": "sha512-ITvGim8FhRiYe4IQ5uHSkj7pVaPDrCTkNd3yq3cV7iZAcJdHTUMPMEHcqSOy9xZ9qFenQCvi+2wjH9a1nXqHww==",
+      "license": "MIT"
+    },
+    "regenerator-runtime": {
+      "version": "0.13.11",
+      "metadata_url": "https://registry.npmjs.org/regenerator-runtime/0.13.11",
+      "tarball": "https://registry.npmjs.org/regenerator-runtime/-/regenerator-runtime-0.13.11.tgz",
+      "integrity": "sha512-kY1AZVr2Ra+t+piVaJ4gxaFaReZVH40AKNo7UCX6W+dEwBo/2oZJzqfuN1qLq1oL45o56cPaTXELwrTh8Fpggg==",
+      "license": "MIT"
+    },
+    "wasm-feature-detect": {
+      "version": "1.8.0",
+      "metadata_url": "https://registry.npmjs.org/wasm-feature-detect/1.8.0",
+      "tarball": "https://registry.npmjs.org/wasm-feature-detect/-/wasm-feature-detect-1.8.0.tgz",
+      "integrity": "sha512-zksaLKM2fVlnB5jQQDqKXXwYHLQUVH9es+5TOOHwGOVJOCeRBCiPjwSg+3tN2AdTCzjgli4jijCH290kXb/zWQ==",
+      "license": "Apache-2.0"
+    },
+    "zlibjs": {
+      "version": "0.3.1",
+      "metadata_url": "https://registry.npmjs.org/zlibjs/0.3.1",
+      "tarball": "https://registry.npmjs.org/zlibjs/-/zlibjs-0.3.1.tgz",
+      "integrity": "sha512-+J9RrgTKOmlxFSDHo0pI1xM6BLVUv+o0ZT9ANtCxGkjIVCCUdx9alUF8Gm+dGLKbkkkidWIHFDZHDMpfITt4+w==",
+      "license": "MIT"
+    }
+  },
+  "consolidated_notice_sources": {
+    "licenses/ZXING_BROWSER_LICENSE.txt": {
+      "sha256": "4c26c3077daa7ce4d56ad91f279fafc395bf33c3a0f1ba9ab8cf511bad148ea5",
+      "bytes": 1069,
+      "package": "@zxing/browser",
+      "source_path": "LICENSE",
+      "contained_in": "THIRD_PARTY_NOTICES.md",
+      "start_byte": 3074,
+      "end_byte": 4143
+    },
+    "licenses/ZXING_BUNDLED_NOTICES.txt": {
+      "sha256": "78ba097bbb32cca525c3b08d972fc0b08917dc0b76bac77bcd9660ea27816fbd",
+      "bytes": 9995,
+      "package": "@zxing/browser",
+      "source_path": "umd/zxing-browser.js (copyright/license comments)",
+      "contained_in": "THIRD_PARTY_NOTICES.md",
+      "start_byte": 4229,
+      "end_byte": 14224
+    },
+    "licenses/TESSERACT_JS_LICENSE.txt": {
+      "sha256": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1",
+      "bytes": 11357,
+      "package": "tesseract.js",
+      "source_path": "LICENSE.md",
+      "contained_in": "THIRD_PARTY_NOTICES.md",
+      "start_byte": 14308,
+      "end_byte": 25665
+    },
+    "licenses/TESSERACT_CORE_LICENSE.txt": {
+      "sha256": "c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08",
+      "bytes": 11358,
+      "package": "tesseract.js-core",
+      "source_path": "LICENSE",
+      "contained_in": "THIRD_PARTY_NOTICES.md",
+      "start_byte": 25753,
+      "end_byte": 37111
+    },
+    "licenses/ZXING_LIBRARY_LICENSE.txt": {
+      "sha256": "849b3ff4527ff587eecc78736b5685bbba7a44b071f3b944da914e832292f6c0",
+      "bytes": 13321,
+      "package": "@zxing/library",
+      "source_path": "LICENSE",
+      "contained_in": "THIRD_PARTY_NOTICES.md",
+      "start_byte": 37197,
+      "end_byte": 50518
+    },
+    "licenses/TESSDATA_LICENSE.txt": {
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "bytes": 11357,
+      "source_url": "https://raw.githubusercontent.com/naptha/tessdata/gh-pages/LICENSE",
+      "contained_in": "THIRD_PARTY_NOTICES.md",
+      "start_byte": 50594,
+      "end_byte": 61951
+    },
+    "licenses/BASE64_JS_LICENSE.txt": {
+      "sha256": "5b37224c080cdcc97c871ada971c224e9926370fe74f11b539aa1cf9f3b1aca1",
+      "bytes": 1081,
+      "notice_package": "base64-js",
+      "source_path": "package/LICENSE",
+      "contained_in": "THIRD_PARTY_NOTICES.md",
+      "start_byte": 62029,
+      "end_byte": 63110
+    },
+    "licenses/BMP_JS_LICENSE.txt": {
+      "sha256": "9f165f5bd2b462122cacb8c6dc32028be1abb4d8ad0322e9a332f30b2ebdb833",
+      "bytes": 1077,
+      "notice_package": "bmp-js",
+      "source_path": "package/LICENSE",
+      "contained_in": "THIRD_PARTY_NOTICES.md",
+      "start_byte": 63182,
+      "end_byte": 64259
+    },
+    "licenses/BUFFER_LICENSE.txt": {
+      "sha256": "06bafa45fdad2579ba0e43b0c9b2c6290287c99c4203c300254a462b38a307f6",
+      "bytes": 1106,
+      "notice_package": "buffer",
+      "source_path": "package/LICENSE",
+      "contained_in": "THIRD_PARTY_NOTICES.md",
+      "start_byte": 64331,
+      "end_byte": 65437
+    },
+    "licenses/IDB_KEYVAL_LICENCE.txt": {
+      "sha256": "20c27d6339619eeb3113cb865d4e98a3f559e52964fc75caea9cb5fa72674565",
+      "bytes": 555,
+      "notice_package": "idb-keyval",
+      "source_path": "package/LICENCE",
+      "contained_in": "THIRD_PARTY_NOTICES.md",
+      "start_byte": 65517,
+      "end_byte": 66072
+    },
+    "licenses/IEEE754_LICENSE.txt": {
+      "sha256": "18d45466ba3253deae04667e267a91ea8de8548f18c1125264d1c9db28194cc1",
+      "bytes": 1465,
+      "notice_package": "ieee754",
+      "source_path": "package/LICENSE",
+      "contained_in": "THIRD_PARTY_NOTICES.md",
+      "start_byte": 66146,
+      "end_byte": 67611
+    },
+    "licenses/IS_URL_LICENSE-MIT.txt": {
+      "sha256": "80957b522b0ea4ce24290953d74d818220c804d1f42cad02b8d7da1c12ce1fc1",
+      "bytes": 1036,
+      "notice_package": "is-url",
+      "source_path": "package/LICENSE-MIT",
+      "contained_in": "THIRD_PARTY_NOTICES.md",
+      "start_byte": 67691,
+      "end_byte": 68727
+    },
+    "licenses/REGENERATOR_RUNTIME_LICENSE.txt": {
+      "sha256": "51887a3d47051ac2fce1210562e5b9fe0830a8a8fabeb272c2d586eeb18a05fd",
+      "bytes": 1080,
+      "notice_package": "regenerator-runtime",
+      "source_path": "package/LICENSE",
+      "contained_in": "THIRD_PARTY_NOTICES.md",
+      "start_byte": 68825,
+      "end_byte": 69905
+    },
+    "licenses/WASM_FEATURE_DETECT_LICENSE.txt": {
+      "sha256": "bcf29b4fd3ec2cb5f9d40a0866da446f6da62170d2ccedf4aeca9cf9406dd20c",
+      "bytes": 11341,
+      "notice_package": "wasm-feature-detect",
+      "source_path": "package/LICENSE",
+      "contained_in": "THIRD_PARTY_NOTICES.md",
+      "start_byte": 70003,
+      "end_byte": 81344
+    },
+    "licenses/ZLIBJS_LICENSE.txt": {
+      "sha256": "131afe3f7bdce1698beb292fb8de1a968de01bce876122a60ef5db230471c866",
+      "bytes": 1222,
+      "notice_package": "zlibjs",
+      "source_path": "package/LICENSE",
+      "contained_in": "THIRD_PARTY_NOTICES.md",
+      "start_byte": 81416,
+      "end_byte": 82638
+    }
+  }
+}

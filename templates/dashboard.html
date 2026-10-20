@@ -24,11 +24,7 @@
   <div class="metric"><div class="v" id="mFiber">{{ "%.1f"|format(totals.fiber) }}g</div><div class="k">Fiber</div></div>
   <div class="metric"><div class="v" id="mCalc">{{ "%.0f"|format(totals.calc_calories) }}</div><div class="k">Calc calories</div></div>
 </div>
-<nav class="mobile-food-tabs" id="mobileFoodTabs" aria-label="Food categories">
-  {% for category, items in grouped.items() %}
-    <button class="mobile-group-tab" type="button" data-category="{{ category|e }}" aria-controls="food-group-{{ loop.index }}" aria-pressed="{{ 'true' if loop.first else 'false' }}">{{ category }}</button>
-  {% endfor %}
-</nav>
+
 </div>
 <p id="fiberNotice" class="small" hidden>Some added foods have no fiber value. The fiber total includes known values only.</p>
 
@@ -86,6 +82,36 @@
   <div class="food-tabs" aria-label="Food entry method">
     <button id="lookupMode" class="btn" type="button" aria-pressed="true">Food lookup</button>
     <button id="manualMode" class="btn" type="button" aria-pressed="false">Enter macros</button>
+  </div>
+  <div class="phone-food-scan" id="foodScanPanel" data-assets="{{ url_for('static', filename='vendor/food-scan/') }}">
+    <div class="food-scan-actions">
+      <button id="scanBarcodeButton" class="btn" type="button">Scan barcode</button>
+      <button id="scanLabelButton" class="btn" type="button">Read nutrition label</button>
+      <button id="cancelFoodScan" class="btn" type="button" hidden>Cancel scan</button>
+    </div>
+    <p class="small" id="liveCameraHint" hidden>Automatic camera scanning needs the app's HTTPS address. You can use photo capture below until HTTPS is set up.</p>
+    <div class="food-live-camera" id="foodLiveCamera" hidden>
+      <div class="food-camera-view">
+        <video id="foodCameraVideo" autoplay muted playsinline aria-label="Live rear camera for food scanning"></video>
+        <div class="food-camera-guide" aria-hidden="true"></div>
+      </div>
+      <p class="small" id="foodCameraGuide">Keep the whole barcode or nutrition label in view and hold still.</p>
+      <button class="btn" id="captureFoodNow" type="button">Capture now</button>
+    </div>
+    <details class="food-scan-photo-options">
+      <summary>Use a photo instead</summary>
+      <div class="food-scan-actions">
+        <button id="photoBarcodeButton" class="btn" type="button">Barcode photo</button>
+        <button id="photoLabelButton" class="btn" type="button">Nutrition label photo</button>
+      </div>
+    </details>
+    <input id="barcodePhoto" type="file" accept="image/*" capture="environment" aria-label="Take a barcode photo" hidden>
+    <input id="nutritionLabelPhoto" type="file" accept="image/*" capture="environment" aria-label="Take a nutrition label photo" hidden>
+    <p class="small food-scan-status" id="foodScanStatus" role="status" aria-live="polite" hidden></p>
+    <details id="foodScanText" class="food-scan-text" hidden>
+      <summary>Text read from label</summary>
+      <pre id="foodScanRawText"></pre>
+    </details>
   </div>
   <div id="lookupArea">
     <form id="lookupForm" class="lookup-controls">
@@ -150,6 +176,11 @@
   <ul id="dayFoodList" class="day-food-list" aria-label="Foods added for this date"></ul>
 </section>
 
+<nav class="mobile-food-tabs" id="mobileFoodTabs" aria-label="Food categories">
+  {% for category, items in grouped.items() %}
+    <button class="mobile-group-tab" type="button" data-category="{{ category|e }}" aria-controls="food-group-{{ loop.index }}" aria-pressed="{{ 'true' if loop.first else 'false' }}">{{ category }}</button>
+  {% endfor %}
+</nav>
 <div class="sections" id="foodSections">
 {% for category, items in grouped.items() %}
   {% set section_index = loop.index %}
@@ -229,5 +260,9 @@
   "dayFoods": day_foods|default([], true),
   "dayFoodTotals": day_food_totals|default({}, true)
 }|tojson }}'></div>
-<script src="{{ url_for('static', filename='dashboard.js', v='temporary-food-grams-eaten-1') }}"></script>
+<script src="{{ url_for('static', filename='dashboard.js', v='mobile-dashboard-layout-3') }}"></script>
+<script src="{{ url_for('static', filename='nutrition_label.js', v='phone-food-scan-4') }}"></script>
+<script src="{{ url_for('static', filename='live_label_detector.js', v='live-food-scan-6') }}"></script>
+<script src="{{ url_for('static', filename='live_food_camera.js', v='live-food-scan-6') }}"></script>
+<script src="{{ url_for('static', filename='food_scanner.js', v='live-food-scan-6') }}"></script>
 {% endblock %}
