@@ -2,6 +2,8 @@
 {% block title %}MELB Nutrition{% endblock %}
 {% block body_class %}dashboard-page{% endblock %}
 {% block content %}
+{% set salt_percent = salt_percent|default(shaker_calibration.salt_g_per_spin * 100 / salt_grams_per_spin) %}
+{% set variable_salt = variable_salt|default({"salt_mode":"shared", "rice_salt_per_185":3, "meal_salt_percent":0.5}) %}
 <div class="datebar">
   <div class="date-controls">
     <button id="previousDay" class="date-arrow" type="button" aria-label="Previous day" title="Previous day">&#8249;</button>
@@ -28,17 +30,96 @@
 </div>
 <p id="fiberNotice" class="small" hidden>Some added foods have no fiber value. The fiber total includes known values only.</p>
 
-<div class="dashboard-actions">
+<div class="dashboard-actions" id="dashboardActions">
   {% set salt_summary = salt_spins|default({"spins":0, "grams":0}, true) %}
   <div class="salt-spin-summary" role="status" aria-live="polite" title="{{ salt_category|default('Dawg Bowl') }} grams plus checked logged foods and configured extra salt weight, divided by {{ "%.4g"|format(salt_grams_per_spin) }}.">
+    <div class="salt-box-toolbar">
+      <div class="salt-mode-segments" role="group" aria-label="Salt calculation mode">
+        <button id="sharedSaltMode" class="salt-mode-button" type="button" aria-pressed="{{ 'true' if variable_salt.salt_mode == 'shared' else 'false' }}"{% if day_locked %} disabled{% endif %}>Shared total</button>
+        <button id="variableSaltMode" class="salt-mode-button" type="button" aria-pressed="{{ 'true' if variable_salt.salt_mode == 'variable' else 'false' }}"{% if day_locked %} disabled{% endif %}>Variable</button>
+      </div>
+      <button id="resetSaltRatios" class="salt-reset-button" type="button" title="Restore this day's default shared ratio, 3 g salt per 185 g dry rice, and 0.5% for the rest of the meal."{% if day_locked %} disabled{% endif %}>Reset ratios</button>
+    </div>
+    <input id="saltVariableMode" type="checkbox" role="switch" aria-label="Variable mode" hidden{% if variable_salt.salt_mode == 'variable' %} checked{% endif %}{% if day_locked %} disabled{% endif %}>
+    <span id="saltCalculationMode" hidden>{{ 'Variable ratios' if variable_salt.salt_mode == 'variable' else 'Shared total' }}</span>
+    <div class="rice-preparation" id="riceSaltToggle">
+      <label for="ricePreparation">Rice preparation</label>
+      <select id="ricePreparation"{% if day_locked %} disabled{% endif %}>
+        <option value="unsalted"{% if not rice_salted %} selected{% endif %}>Unsalted</option>
+        <option value="salted"{% if rice_salted %} selected{% endif %}>Salted separately</option>
+      </select>
+    </div>
+    <input id="riceSalted" type="checkbox" role="switch" aria-label="Rice salted separately" hidden{% if rice_salted %} checked{% endif %}{% if day_locked %} disabled{% endif %}>
+    <span id="riceSaltMode" hidden>{{ 'Salted rice' if rice_salted else 'Unsalted rice' }}</span>
+    <details class="salt-ratio-controls" id="saltRatioControls">
+      <summary>Salt ratio: <strong id="saltPercentLabel">{{ '%.2f'|format(salt_percent) }}%</strong>
+        <span id="saltSpinRatio">1 spin / {{ "%.4g"|format(salt_grams_per_spin) }} g</span>
+      </summary>
+      <div class="salt-ratio-inputs">
+        <input id="saltPercentSlider" type="range" min="0.01" max="2" step="0.01" value="{{ salt_percent }}" aria-label="Salt percentage"{% if day_locked %} disabled{% endif %}>
+        <label for="saltPercentInput">Salt %
+          <input id="saltPercentInput" type="number" inputmode="decimal" min="0.01" max="2" step="any" value="{{ '%.8g'|format(salt_percent) }}"{% if day_locked %} disabled{% endif %}>
+        </label>
+      </div>
+      <p class="small">Percentage of calculated salt weight, including extra rice weight. Saved for this day only.</p>
+    </details>
+    <div id="unsaltedSaltSummary" class="salt-plan-summary"{% if rice_salted %} hidden{% endif %}>
     <span>Salt shaker: ~<strong id="saltSpins">{{ salt_summary.spins }}</strong> spins</span>
     <span class="small shaker-output" title="Based on your measured shaker output: 60 spins = {{ (shaker_calibration.salt_g_per_spin * 60)|round(2) }} g salt and {{ (shaker_calibration.sodium_mg_per_spin * 60)|round|int }} mg sodium. Estimates cover added shaker salt only.">
       Estimated dispensed: ~<strong id="saltDispensed">{{ "%.2f"|format(shaker_output.salt_g) }}</strong> g salt
       &middot; ~<strong id="saltSodium">{{ "{:,.0f}".format(shaker_output.sodium_mg) }}</strong> mg sodium
     </span>
-    <span class="small"><span id="saltMealGrams">{{ salt_summary.grams }}</span> g salt weight &middot; 1 spin / {{ "%.4g"|format(salt_grams_per_spin) }} g</span>
+    <span class="small"><span id="saltMealGrams">{{ salt_summary.grams }}</span> g salt weight</span>
     <span class="small">Extra salt weight: +<span id="saltRiceBonus">{{ salt_summary.rice_bonus|default(0) }}</span> g</span>
+    </div>
+    <div id="riceSaltBreakdown" class="rice-salt-breakdown"{% if not rice_salted %} hidden{% endif %}>
+      <div class="salt-portion" title="3 g salt per 185 g dry rice">
+        <div class="salt-portion-heading"><span>Rice</span><span id="riceDryWeight"></span></div>
+        <strong id="riceSaltAmount"></strong>
+        <span id="riceSaltDetails" class="small"></span>
+        <span id="riceSaltAllocationNote" class="small" hidden></span>
+        <details class="variable-ratio-controls" id="riceVariableRatio" hidden>
+          <summary>Rice ratio: <strong id="riceRatioLabel">3 g / 185 g dry</strong></summary>
+          <label for="riceRatioInput">Salt per 185 g dry rice (g)</label>
+          <div class="variable-ratio-inputs">
+            <input id="riceRatioSlider" type="range" min="0" max="10" step="0.1" value="{{ variable_salt.rice_salt_per_185 }}" aria-label="Rice salt grams per 185 grams dry rice"{% if day_locked %} disabled{% endif %}>
+            <input id="riceRatioInput" type="number" inputmode="decimal" min="0" max="10" step="any" value="{{ variable_salt.rice_salt_per_185 }}" aria-label="Rice salt grams per 185 grams dry rice"{% if day_locked %} disabled{% endif %}>
+          </div>
+        </details>
+        <details class="portion-seasoning" id="riceSeasoning">
+          <summary>Use seasoning</summary>
+          <div class="seasoning-fields">
+            <label for="riceSeasoningServing"><span>Serving (g)</span><input id="riceSeasoningServing" aria-label="Rice seasoning serving size in grams" type="number" inputmode="decimal" min="0" step="any" value="1"></label>
+            <label for="riceSeasoningSodium"><span>Sodium (mg)</span><input id="riceSeasoningSodium" aria-label="Rice seasoning sodium per serving in milligrams" type="number" inputmode="decimal" min="0" step="any" placeholder="e.g. 241"></label>
+          </div>
+          <p id="riceSeasoningResult" class="portion-seasoning-result" role="status" aria-live="polite">Enter sodium per serving.</p>
+        </details>
+      </div>
+      <div class="salt-portion" title="Unsalted total minus the salt allocated to rice">
+        <div class="salt-portion-heading"><span>Rest of bowl</span></div>
+        <strong id="bowlSaltAmount"></strong>
+        <span id="bowlSaltDetails" class="small"></span>
+        <details class="variable-ratio-controls" id="mealVariableRatio" hidden>
+          <summary>Meal ratio: <strong id="mealRatioLabel">0.5%</strong></summary>
+          <label for="mealRatioInput">Salt by food weight (%)</label>
+          <div class="variable-ratio-inputs">
+            <input id="mealRatioSlider" type="range" min="0" max="2" step="0.01" value="{{ variable_salt.meal_salt_percent }}" aria-label="Rest of meal salt percentage"{% if day_locked %} disabled{% endif %}>
+            <input id="mealRatioInput" type="number" inputmode="decimal" min="0" max="2" step="any" value="{{ variable_salt.meal_salt_percent }}" aria-label="Rest of meal salt percentage"{% if day_locked %} disabled{% endif %}>
+          </div>
+        </details>
+        <details class="portion-seasoning" id="bowlSeasoning">
+          <summary>Use seasoning</summary>
+          <div class="seasoning-fields">
+            <label for="bowlSeasoningServing"><span>Serving (g)</span><input id="bowlSeasoningServing" aria-label="Bowl seasoning serving size in grams" type="number" inputmode="decimal" min="0" step="any" value="1"></label>
+            <label for="bowlSeasoningSodium"><span>Sodium (mg)</span><input id="bowlSeasoningSodium" aria-label="Bowl seasoning sodium per serving in milligrams" type="number" inputmode="decimal" min="0" step="any" placeholder="e.g. 241"></label>
+          </div>
+          <p id="bowlSeasoningResult" class="portion-seasoning-result" role="status" aria-live="polite">Enter sodium per serving.</p>
+        </details>
+      </div>
+    </div>
+    <div id="saltCombinedTotal" class="salt-combined-total" role="status" hidden></div>
   </div>
+  <div class="day-action-buttons">
   <button class="btn" id="seasoningToggle" type="button" aria-expanded="false" aria-controls="seasoningPanel">Seasoning calculator</button>
   <button class="btn" id="dayLockButton" type="button" aria-pressed="{{ 'true' if day_locked else 'false' }}">{{ 'Unlock day' if day_locked else 'Lock day' }}</button>
   <button class="btn primary" id="healthButton" type="button">Send totals to Apple Health</button>
@@ -46,15 +127,16 @@
     <input type="hidden" name="day" value="{{ day }}">
     <button id="resetDayButton" class="btn danger" type="submit">Reset day</button>
   </form>
-</div>
+  </div>
   <section class="seasoning-calculator" id="seasoningPanel" aria-label="Seasoning sodium calculator" hidden>
-    <p class="small seasoning-help">Match the shaker's sodium estimate using your seasoning's nutrition label.</p>
+    <p class="small seasoning-help">Enter your seasoning label to match the salt amounts above.</p>
     <div class="seasoning-fields">
       <label for="seasoningServing"><span>Serving size (g)</span><input id="seasoningServing" type="number" inputmode="decimal" min="0" step="any" value="1"></label>
       <label for="seasoningSodium"><span>Sodium per serving (mg)</span><input id="seasoningSodium" type="number" inputmode="decimal" min="0" step="any" placeholder="e.g. 241"></label>
     </div>
     <p class="seasoning-result" id="seasoningResult" role="status" aria-live="polite">Enter your seasoning's sodium per serving.</p>
   </section>
+</div>
 <p id="dayLockNotice" class="small day-lock-notice" role="status"{% if not day_locked %} hidden{% endif %}>Day locked. Food entries, library settings and totals are frozen. Unlock to make changes.</p>
 <div class="small health-export-note">
   Apple Health logging is intended for one final export of the day. Re-running the Shortcut can create duplicate Health samples.
@@ -253,6 +335,8 @@
   "saltCategory": salt_category|default("Dawg Bowl"),
   "saltGramsPerSpin": salt_grams_per_spin,
   "shakerCalibration": shaker_calibration,
+  "riceSalted": rice_salted|default(false),
+  "variableSalt": variable_salt,
   "shortcutName": shortcut_name,
   "healthBurn": ((health_snapshot.active_calories + health_snapshot.resting_calories)
     if health_snapshot and health_snapshot.active_calories is not none
@@ -260,7 +344,7 @@
   "dayFoods": day_foods|default([], true),
   "dayFoodTotals": day_food_totals|default({}, true)
 }|tojson }}'></div>
-<script src="{{ url_for('static', filename='dashboard.js', v='mobile-dashboard-layout-3') }}"></script>
+<script src="{{ url_for('static', filename='dashboard.js', v='salt-ratio-reset-1') }}"></script>
 <script src="{{ url_for('static', filename='nutrition_label.js', v='phone-food-scan-4') }}"></script>
 <script src="{{ url_for('static', filename='live_label_detector.js', v='live-food-scan-6') }}"></script>
 <script src="{{ url_for('static', filename='live_food_camera.js', v='live-food-scan-6') }}"></script>

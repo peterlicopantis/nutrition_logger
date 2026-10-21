@@ -163,3 +163,140 @@ assert.equal(elements.saltSodium.textContent,"0");
             "salt_g_per_spin":melb.SHAKER_SALT_G_PER_SPIN,
             "sodium_mg_per_spin":melb.SHAKER_SODIUM_MG_PER_SPIN}),
             {"salt_g":4.5,"sodium_mg":1769})
+
+
+    def test_daily_percentage_changes_salt_but_not_macros_and_preserves_rice_setting(self):
+        day="2026-10-07"
+        self.client.post("/api/entry",json={"day":day,"food_name":"Regular food","amount":1000})
+        macros=melb.day_totals_for(day)
+        self.assertEqual(self.client.patch("/api/day-salt",json={"day":day,"salt_percent":.5}).status_code,200)
+        html=self.client.get("/?day="+day).get_data(as_text=True)
+        self.assertIn('1 spin / 15 g',html)
+        self.assertIn('id="saltDispensed">5.00',html)
+        self.assertEqual(melb.day_salt_percentage(day),.5)
+        self.client.patch("/api/day-salt",json={"day":day,"rice_salted":True})
+        self.assertEqual(melb.day_salt_percentage(day),.5)
+        self.client.patch("/api/day-salt",json={"day":day,"salt_percent":.6})
+        self.assertTrue(melb.day_rice_salted(day))
+        self.assertEqual(melb.day_totals_for(day),macros)
+
+    def test_future_default_does_not_change_today_past_days_or_pinned_future_day(self):
+        self.client.post("/settings",data={"shortcut_name":"Test","default_salt_percent":".5"})
+        self.assertIsNone(melb.day_salt_percentage("2026-10-06"))
+        self.assertIsNone(melb.day_salt_percentage("2026-10-07"))
+        self.assertEqual(melb.day_salt_percentage("2026-10-08"),.5)
+        self.client.post("/settings",data={"shortcut_name":"Test","default_salt_percent":".6"})
+        self.assertEqual(melb.day_salt_percentage("2026-10-08"),.5)
+        self.assertEqual(melb.day_salt_percentage("2026-10-09"),.6)
+        self.client.patch("/api/day-salt",json={"day":"2026-10-10","salt_percent":.7})
+        self.assertEqual(melb.day_salt_percentage("2026-10-10"),.7)
+
+    def test_percentage_is_frozen_when_locked_and_remains_after_unlock(self):
+        day="2026-10-07"
+        self.client.patch("/api/day-salt",json={"day":day,"salt_percent":.5})
+        self.client.post("/api/day-lock",json={"day":day,"locked":True})
+        snapshot=melb.locked_day_snapshot(day)
+        self.assertEqual(snapshot["salt_grams_per_spin"],15)
+        self.assertEqual(self.client.patch("/api/day-salt",json={"day":day,"salt_percent":.8}).status_code,423)
+        self.client.post("/settings",data={"shortcut_name":"Test","default_salt_percent":".8"})
+        self.assertEqual(melb.locked_day_snapshot(day),snapshot)
+        self.assertIn('1 spin / 15 g',self.client.get("/?day="+day).get_data(as_text=True))
+        self.client.post("/api/day-lock",json={"day":day,"locked":False})
+        self.assertEqual(melb.day_salt_percentage(day),.5)
+
+    def test_percentage_validation_rejects_invalid_requests_and_settings(self):
+        for value in (0,-1,2.01,None,True,"","NaN","Infinity","no"):
+            with self.subTest(value=value):
+                self.assertEqual(self.client.patch("/api/day-salt",json={"day":"2026-10-07","salt_percent":value}).status_code,400)
+        self.client.post("/settings",data={"shortcut_name":"Changed","default_salt_percent":"NaN"})
+        self.assertEqual(melb.load_config()["shortcut_name"],"Test")
+        self.assertIsNone(melb.default_salt_percentage("2026-10-08"))
+
+    def test_schema_upgrade_preserves_existing_rice_preference(self):
+        with melb.db() as conn:
+            conn.execute("DROP TABLE day_salt_settings")
+            conn.execute("CREATE TABLE day_salt_settings(day TEXT PRIMARY KEY,rice_salted INTEGER NOT NULL DEFAULT 0)")
+            conn.execute("INSERT INTO day_salt_settings VALUES ('2026-10-07',1)")
+        melb.init_db()
+        self.assertTrue(melb.day_rice_salted("2026-10-07"))
+        self.assertIsNone(melb.day_salt_percentage("2026-10-07"))
+
+
+    def test_variable_settings_default_to_shared_and_save_per_day(self):
+        day="2026-10-07"
+        self.assertEqual(melb.day_variable_salt_settings(day),{
+            "salt_mode":"shared","rice_salt_per_185":3,"meal_salt_percent":.5})
+        response=self.client.patch("/api/day-salt",json={"day":day,"salt_mode":"variable",
+            "rice_salt_per_185":4,"meal_salt_percent":.75})
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(melb.day_variable_salt_settings(day),{
+            "salt_mode":"variable","rice_salt_per_185":4,"meal_salt_percent":.75})
+        self.assertEqual(melb.day_variable_salt_settings("2026-10-08")["salt_mode"],"shared")
+        self.client.patch("/api/day-salt",json={"day":day,"salt_percent":.6,"rice_salted":True})
+        self.assertEqual(melb.day_variable_salt_settings(day)["salt_mode"],"variable")
+        self.client.post("/reset",data={"day":day})
+        self.assertEqual(melb.day_variable_salt_settings(day)["salt_mode"],"shared")
+
+    def test_variable_settings_freeze_when_locked_and_old_snapshots_keep_shared_mode(self):
+        day="2026-10-07"
+        self.client.patch("/api/day-salt",json={"day":day,"salt_mode":"variable","rice_salt_per_185":6,"meal_salt_percent":1})
+        self.client.post("/api/day-lock",json={"day":day,"locked":True})
+        self.assertEqual(melb.locked_day_snapshot(day)["rice_salt_per_185"],6)
+        self.assertEqual(self.client.patch("/api/day-salt",json={"day":day,"meal_salt_percent":.1}).status_code,423)
+        with melb.db() as conn:
+            conn.execute("UPDATE day_salt_settings SET rice_salt_per_185=1, salt_mode='shared' WHERE day=?",(day,))
+        self.assertEqual(melb.day_variable_salt_settings(day)["rice_salt_per_185"],6)
+        snapshot=melb.locked_day_snapshot(day)
+        for key in ("salt_mode","rice_salt_per_185","meal_salt_percent"):
+            del snapshot[key]
+        with melb.db() as conn:
+            conn.execute("UPDATE day_locks SET snapshot_json=? WHERE day=?",(json.dumps(snapshot),day))
+        self.assertEqual(melb.day_variable_salt_settings(day),{
+            "salt_mode":"shared","rice_salt_per_185":3,"meal_salt_percent":.5})
+
+    def test_variable_settings_validate_all_fields_before_saving(self):
+        for key,values in {
+            "salt_mode":["other",True,None,{}],
+            "rice_salt_per_185":[-1,10.1,True,None,"NaN"],
+            "meal_salt_percent":[-1,2.1,True,None,"Infinity"],
+        }.items():
+            for value in values:
+                with self.subTest(key=key,value=value):
+                    self.assertEqual(self.client.patch("/api/day-salt",json={
+                        "day":"2026-10-07","salt_mode":"variable",key:value}).status_code,400)
+        self.assertEqual(melb.day_variable_salt_settings("2026-10-07")["salt_mode"],"shared")
+        self.assertEqual(self.client.patch("/api/day-salt",json={"day":"2026-10-07",
+            "rice_salt_per_185":0,"meal_salt_percent":0,"salt_mode":"variable"}).status_code,200)
+
+
+    def test_reset_ratios_restores_defaults_without_changing_mode_or_foods(self):
+        day = "2026-10-07"
+        self.client.post("/api/entry", json={"day":day,"food_name":"Regular food","amount":500})
+        macros = melb.day_totals_for(day)
+        self.client.patch("/api/day-salt", json={"day":day,"salt_mode":"variable",
+            "rice_salted":True,"salt_percent":.9,"rice_salt_per_185":6,"meal_salt_percent":1})
+        response = self.client.patch("/api/day-salt", json={"day":day,"reset_ratios":True})
+        self.assertEqual(response.status_code,200)
+        self.assertAlmostEqual(response.json["salt_percent"],
+            melb.SHAKER_SALT_G_PER_SPIN * 100 / melb.SALT_GRAMS_PER_SPIN)
+        self.assertEqual(melb.day_variable_salt_settings(day),
+            {"salt_mode":"variable","rice_salt_per_185":3,"meal_salt_percent":.5})
+        self.assertTrue(melb.day_rice_salted(day))
+        self.assertEqual(melb.day_totals_for(day),macros)
+
+    def test_reset_ratios_uses_default_applicable_to_selected_day(self):
+        self.client.post("/settings",data={"shortcut_name":"Test","default_salt_percent":".6"})
+        day = "2026-10-08"
+        self.client.patch("/api/day-salt",json={"day":day,"salt_percent":1})
+        response = self.client.patch("/api/day-salt",json={"day":day,"reset_ratios":True})
+        self.assertEqual(response.json["salt_percent"],.6)
+        self.assertIsNone(melb.day_salt_percentage("2026-10-06"))
+
+    def test_reset_ratios_rejects_locked_days_and_mixed_requests(self):
+        day = "2026-10-07"
+        for extra in ({"reset_ratios":False},{"reset_ratios":True,"salt_percent":.8}):
+            self.assertEqual(self.client.patch("/api/day-salt",json={"day":day,**extra}).status_code,400)
+        self.client.post("/api/day-lock",json={"day":day,"locked":True})
+        snapshot = melb.locked_day_snapshot(day)
+        self.assertEqual(self.client.patch("/api/day-salt",json={"day":day,"reset_ratios":True}).status_code,423)
+        self.assertEqual(melb.locked_day_snapshot(day),snapshot)
