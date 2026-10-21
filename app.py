@@ -9,7 +9,7 @@ import sqlite3
 import threading
 from contextlib import contextmanager, closing
 from collections.abc import Iterator
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from functools import wraps
 
@@ -37,6 +37,8 @@ CATEGORIES = [SALT_CATEGORY]
 
 app = Flask(__name__)
 app.config["JSON_SORT_KEYS"] = False
+# Reload edited templates so live HTML stays in step with the static JavaScript.
+app.config["TEMPLATES_AUTO_RELOAD"] = True
 FOOD_LIBRARY_LOCK = threading.RLock()
 
 
@@ -302,6 +304,13 @@ def init_db() -> None:
                 foods_json TEXT NOT NULL, categories_json TEXT NOT NULL,
                 salt_category TEXT NOT NULL, created_at TEXT NOT NULL)""")
             conn.execute("CREATE INDEX IF NOT EXISTS food_library_versions_day ON food_library_versions(effective_day)")
+            conn.execute("""CREATE TABLE IF NOT EXISTS day_salt_settings (
+                day TEXT PRIMARY KEY, rice_salted INTEGER NOT NULL DEFAULT 0)""")
+            salt_columns = {row["name"] for row in conn.execute("PRAGMA table_info(day_salt_settings)")}
+            if "salt_percent" not in salt_columns:
+                conn.execute("ALTER TABLE day_salt_settings ADD COLUMN salt_percent REAL")
+            conn.execute("""CREATE TABLE IF NOT EXISTS salt_percentage_defaults (
+                effective_day TEXT PRIMARY KEY, salt_percent REAL NOT NULL)""")
             conn.execute("""CREATE TABLE IF NOT EXISTS day_locks (
                 day TEXT PRIMARY KEY, snapshot_json TEXT NOT NULL, locked_at TEXT NOT NULL)""")
         initialize_library_history()
@@ -776,6 +785,9 @@ def dashboard():
         if locked_snapshot is not None else {
             "salt_g_per_spin": SHAKER_SALT_G_PER_SPIN,
             "sodium_mg_per_spin": SHAKER_SODIUM_MG_PER_SPIN})
+    if locked_snapshot is None:
+        grams_per_spin = day_grams_per_spin(day)
+    salt_percent = shaker_calibration["salt_g_per_spin"] * 100 / grams_per_spin
     salt_summary = salt_spins_for(foods, amounts, day_foods,
                                  library_state["salt_category"], grams_per_spin)
     # Displayed spins have one decimal; derive output from the underlying mass.
@@ -793,7 +805,9 @@ def dashboard():
         "dashboard.html",
         day=day,
         salt_spins=salt_summary,
+        rice_salted=day_rice_salted(day),
         salt_grams_per_spin=grams_per_spin,
+        salt_percent=salt_percent,
         shaker_output=shaker_output,
         shaker_calibration=shaker_calibration,
         salt_category=library_state["salt_category"],
@@ -807,6 +821,91 @@ def dashboard():
         health_snapshot=snapshot,
         energy_balance=balance,
     )
+
+
+
+
+def checked_salt_percentage(value) -> float:
+    if isinstance(value, bool):
+        raise ValueError("Salt percentage must be between 0.01 and 2.")
+    try:
+        percent = float(value)
+    except (TypeError, ValueError, OverflowError):
+        raise ValueError("Salt percentage must be between 0.01 and 2.") from None
+    if not math.isfinite(percent) or not 0.01 <= percent <= 2:
+        raise ValueError("Salt percentage must be between 0.01 and 2.")
+    return percent
+
+
+def default_salt_percentage(day: str) -> float | None:
+    with db() as conn:
+        row = conn.execute("""SELECT salt_percent FROM salt_percentage_defaults
+                              WHERE effective_day <= ? ORDER BY effective_day DESC LIMIT 1""", (day,)).fetchone()
+    return float(row["salt_percent"]) if row else None
+
+
+def day_salt_percentage(day: str) -> float | None:
+    with db() as conn:
+        row = conn.execute("SELECT salt_percent FROM day_salt_settings WHERE day = ?", (day,)).fetchone()
+    if row and row["salt_percent"] is not None:
+        return float(row["salt_percent"])
+    percent = default_salt_percentage(day)
+    if percent is not None:
+        # Pin an inherited default once a day uses it; later default changes must
+        # not rewrite a day the user has already opened.
+        with db() as conn:
+            conn.execute("""INSERT INTO day_salt_settings(day, salt_percent) VALUES (?, ?)
+                            ON CONFLICT(day) DO UPDATE SET salt_percent =
+                            COALESCE(day_salt_settings.salt_percent, excluded.salt_percent)""", (day, percent))
+            row = conn.execute("SELECT salt_percent FROM day_salt_settings WHERE day = ?", (day,)).fetchone()
+        return float(row["salt_percent"])
+    return None
+
+
+def day_grams_per_spin(day: str) -> float:
+    percent = day_salt_percentage(day)
+    return SALT_GRAMS_PER_SPIN if percent is None else SHAKER_SALT_G_PER_SPIN * 100 / percent
+
+
+def day_rice_salted(day: str) -> bool:
+    snapshot = locked_day_snapshot(day)
+    if snapshot is not None:
+        return bool(snapshot.get("rice_salted", False))
+    with db() as conn:
+        row = conn.execute("SELECT rice_salted FROM day_salt_settings WHERE day = ?", (day,)).fetchone()
+    return bool(row["rice_salted"]) if row else False
+
+
+@app.patch("/api/day-salt")
+@serialize_day_write
+def api_day_salt():
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify(ok=False, error="Send the selected day and rice setting as JSON."), 400
+    try:
+        day = required_day(payload)
+        if not {"rice_salted", "salt_percent"}.intersection(payload):
+            raise ValueError("Choose a rice setting or salt percentage.")
+        if "rice_salted" in payload and not isinstance(payload["rice_salted"], bool):
+            raise ValueError("Choose salted or unsalted rice.")
+        percent = checked_salt_percentage(payload["salt_percent"]) if "salt_percent" in payload else None
+    except ValueError as exc:
+        return jsonify(ok=False, error=str(exc)), 400
+    error = locked_day_error(day)
+    if error is not None:
+        return error
+    with db() as conn:
+        if "rice_salted" in payload:
+            conn.execute("""INSERT INTO day_salt_settings(day, rice_salted) VALUES (?, ?)
+                            ON CONFLICT(day) DO UPDATE SET rice_salted = excluded.rice_salted""",
+                         (day, int(payload["rice_salted"])))
+        if percent is not None:
+            conn.execute("""INSERT INTO day_salt_settings(day, salt_percent) VALUES (?, ?)
+                            ON CONFLICT(day) DO UPDATE SET salt_percent = excluded.salt_percent""",
+                         (day, percent))
+    return jsonify(ok=True, rice_salted=day_rice_salted(day),
+                   salt_percent=day_salt_percentage(day))
+
 
 
 @app.post("/api/day-lock")
@@ -827,9 +926,10 @@ def api_day_lock():
         if existing is None:
             library = library_state_for_day(day)
             snapshot = {"library": library, "amounts": load_amounts(day),
+                        "rice_salted": day_rice_salted(day),
                         "day_foods": load_day_foods(day),
                         "health_snapshot": latest_health_snapshot(day),
-                        "salt_grams_per_spin": SALT_GRAMS_PER_SPIN,
+                        "salt_grams_per_spin": day_grams_per_spin(day),
                         "shaker_calibration": {
                             "salt_g_per_spin": SHAKER_SALT_G_PER_SPIN,
                             "sodium_mg_per_spin": SHAKER_SODIUM_MG_PER_SPIN}}
@@ -901,6 +1001,7 @@ def reset_day():
     with db() as conn:
         conn.execute("DELETE FROM daily_entries WHERE day = ?", (day,))
         conn.execute("DELETE FROM day_foods WHERE day = ?", (day,))
+        conn.execute("DELETE FROM day_salt_settings WHERE day = ?", (day,))
     return redirect(url_for("dashboard", day=day))
 
 
@@ -1274,18 +1375,39 @@ def api_health_snapshot():
 @app.route("/settings", methods=["GET", "POST"])
 def settings_page():
     cfg = load_config()
+    init_db()
     message = None
+    error = None
+    effective_day = (date.today() + timedelta(days=1)).isoformat()
     if request.method == "POST":
-        shortcut_name = request.form.get("shortcut_name", "").strip()
-        if shortcut_name:
-            cfg["shortcut_name"] = shortcut_name
-            save_config(cfg)
-            message = "Settings saved."
+        try:
+            percent = (checked_salt_percentage(request.form["default_salt_percent"])
+                       if "default_salt_percent" in request.form else None)
+            shortcut_name = request.form.get("shortcut_name", "").strip()
+            with FOOD_LIBRARY_LOCK:
+                if shortcut_name:
+                    cfg["shortcut_name"] = shortcut_name
+                    save_config(cfg)
+                if percent is not None:
+                    with db() as conn:
+                        conn.execute("""INSERT INTO salt_percentage_defaults(effective_day, salt_percent)
+                                        VALUES (?, ?) ON CONFLICT(effective_day)
+                                        DO UPDATE SET salt_percent = excluded.salt_percent""",
+                                     (effective_day, percent))
+            message = "Settings saved. The salt default applies to new days starting tomorrow."
+        except ValueError as exc:
+            error = str(exc)
+    default_percent = default_salt_percentage(effective_day)
+    if default_percent is None:
+        default_percent = SHAKER_SALT_G_PER_SPIN * 100 / SALT_GRAMS_PER_SPIN
 
     import_url = request.host_url.rstrip("/") + "/api/health-snapshot"
     return render_template(
         "settings.html",
         cfg=cfg,
+        error=error,
+        default_salt_percent=default_percent,
+        salt_default_effective_day=effective_day,
         import_url=import_url,
         message=message,
     )

@@ -32,7 +32,7 @@ class CheckboxFoodTests(unittest.TestCase):
         html=self.client.get("/?day=2026-10-07").get_data(as_text=True)
         self.assertIn("food-checkbox",html)
         self.assertIn('data-checkbox-amount="50.0"',html)
-        self.assertEqual(html.count('type="range"'),2) # regular food and temporary servings
+        self.assertEqual(html.count('type="range"'),3) # regular food, temporary servings, and salt percentage
         self.assertIn("one check = 50.0",self.client.get("/foods").get_data(as_text=True))
 
     def test_check_adds_exact_configured_macros_and_uncheck_removes_them(self):

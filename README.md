@@ -54,7 +54,7 @@ sign in; VS Code and a command window are not needed. Open
 http://127.0.0.1:8501 on the PC or your existing phone address.
 
 Startup errors are saved in logs/startup.log. Logs stay local and are ignored
-by Git. The launcher exits if MELB is already running. Keep this project folder
+by Git. The automatic launcher exits if MELB is already running. To reload code changes, close the manual command window and double-click RUN_MELB_APP.bat. That manual launcher stops the verified server from this project folder, including the hidden startup copy, before starting the current code in its window. It refuses to stop a different program or a server from another folder. Keep this project folder
 in place; rerun ENABLE_AUTOSTART.bat if you move it.
 
 To disable automatic startup, press Win+R, enter shell:startup, and remove
@@ -487,3 +487,11 @@ remain available when live camera access is unavailable or denied.
 Nutrition-label scans use word positions to keep separated calorie numbers on their correct rows and recognize printed zero grams that OCR reads as Og. Check every value before saving; unclear serving weights remain blank rather than guessing digits.
 
 Scanner dependencies live in static/vendor/food-scan so clones serve their own barcode and OCR assets. Full dependency licenses are consolidated in THIRD_PARTY_NOTICES.md; the two adjacent bundle .LICENSE.txt files are retained because the upstream JavaScript references them. asset-manifest.json records versions, runtime file hashes, and the original license sections. There is no npm build step.
+
+### Salted rice
+
+The salt summary has an Unsalted rice / Salted rice switch saved for each date. Unsalted keeps the existing shaker formula. Salted allocates the existing unsalted total between rice and the rest of the bowl. Rice requests **3 g salt per 185 g dry rice**; the rest of the bowl gets the remaining salt, so both portions sum to the unsalted total. If that rice recipe exceeds the total, rice receives the available total, the bowl receives zero, and a note shows the full rice recipe target. Recognized rice foods in Dawg Bowl and checked temporary rice entries count toward the rice portion. Both portions show salt grams, approximate shaker spins, and sodium; each portion has its own expandable Use seasoning calculator with independent serving grams and sodium inputs. Open either portion on its own or use a different seasoning for each. Unsalted mode keeps the original overall seasoning calculator. These preparation estimates do not change food macros. Locking freezes the switch with that day's entries; older locked days default to unsalted. Reset day restores unsalted mode.
+
+### Adjustable salt percentage
+
+Expand **Salt ratio** in the salt box to adjust the selected day with a slider or percentage input (0.01-2%). The equivalent **1 spin / ... g** stays visible. The baseline is about 0.363%, preserving the previous recipe; 0.5% means 5 g salt per 1,000 g of calculated salt weight, including configured extra rice weight. Both salted-rice portions share that total budget, and seasoning conversions update with it. The percentage saves per day and is disabled when locked. Settings contains **Default salt percentage**, effective tomorrow for new days; existing per-day values and locked days are preserved. Previously unopened past days retain the original baseline. A reset clears that day's adjustment so its applicable default is used again.

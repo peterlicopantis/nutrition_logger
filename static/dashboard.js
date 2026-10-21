@@ -3,8 +3,9 @@ const DAY = dashboardConfig.day;
 const DAY_LOCKED = Boolean(dashboardConfig.dayLocked);
 let dayLockChanging = false;
 const SALT_CATEGORY = dashboardConfig.saltCategory || "Dawg Bowl";
-const SALT_GRAMS_PER_SPIN = dashboardConfig.saltGramsPerSpin;
+let SALT_GRAMS_PER_SPIN = dashboardConfig.saltGramsPerSpin;
 const SHAKER_CALIBRATION = dashboardConfig.shakerCalibration;
+let confirmedSaltPercent = SHAKER_CALIBRATION.salt_g_per_spin * 100 / SALT_GRAMS_PER_SPIN;
 const desktopLayout = window.matchMedia("(min-width:1024px)");
 const phoneLayout = window.matchMedia("(max-width:600px), (max-width:900px) and (pointer:coarse)");
 const compactPanels = [document.getElementById("dayFoodPanel"), document.getElementById("healthPanel")].filter(Boolean);
@@ -110,13 +111,17 @@ function isRiceForSpins(name) {
     "cooked white rice", "cooked brown rice"].includes(key) || key.startsWith("rice,");
 }
 function computeSaltSpins() {
-  let grams = 0, riceBonus = 0;
+  let grams = 0, riceBonus = 0, riceGrams = 0, riceSaltWeight = 0;
   for (const input of inputs) {
     if (input.closest(".section")?.dataset.category === SALT_CATEGORY &&
         input.closest(".foodrow")?.dataset.unit === "g") {
       const mass = n(input.dataset.amount);
       grams += mass;
       riceBonus += mass * n(input.dataset.saltExtra);
+      if (isRiceForSpins(input.dataset.name)) {
+        riceGrams += mass;
+        riceSaltWeight += mass * (1 + n(input.dataset.saltExtra));
+      }
     }
   }
   for (const food of dayFoods) {
@@ -126,21 +131,82 @@ function computeSaltSpins() {
       const factor = food.salt_extra_weight_factor ??
         (isRiceForSpins(food.name) ? 1.5 : 0);
       riceBonus += mass * n(factor);
+      if (isRiceForSpins(food.name)) {
+        riceGrams += mass;
+        riceSaltWeight += mass * (1 + n(factor));
+      }
     }
   }
   grams += riceBonus;
   const spins = grams / SALT_GRAMS_PER_SPIN;
-  return {grams, spins, riceBonus,
+  return {grams, spins, riceBonus, riceGrams, riceSaltWeight,
     saltDispensed:spins * SHAKER_CALIBRATION.salt_g_per_spin,
     sodiumMg:spins * SHAKER_CALIBRATION.sodium_mg_per_spin};
 }
+function saltedRicePlan(result=computeSaltSpins()) {
+  const recipeSaltG = result.riceGrams * 3 / 185;
+  const riceSaltG = Math.min(recipeSaltG, result.saltDispensed);
+  const bowlSaltG = Math.max(0, result.saltDispensed - riceSaltG);
+  const riceSpins = riceSaltG / SHAKER_CALIBRATION.salt_g_per_spin;
+  const riceSodiumMg = riceSpins * SHAKER_CALIBRATION.sodium_mg_per_spin;
+  return {
+    riceGrams:result.riceGrams, recipeSaltG, riceSaltG, riceSpins, riceSodiumMg,
+    bowlSpins:bowlSaltG / SHAKER_CALIBRATION.salt_g_per_spin, bowlSaltG,
+    bowlSodiumMg:Math.max(0, result.sodiumMg - riceSodiumMg),
+    totalSaltG:result.saltDispensed, totalSodiumMg:result.sodiumMg,
+    riceLimited:recipeSaltG > result.saltDispensed + 1e-9
+  };
+}
+
 function renderSaltSpins() {
   const result = computeSaltSpins();
+  const percentLabel = document.getElementById("saltPercentLabel");
+  const spinRatio = document.getElementById("saltSpinRatio");
+  if (percentLabel) percentLabel.textContent = (SHAKER_CALIBRATION.salt_g_per_spin * 100 / SALT_GRAMS_PER_SPIN).toFixed(2) + "%";
+  if (spinRatio) spinRatio.textContent = "1 spin / " + rounded(SALT_GRAMS_PER_SPIN, 2) + " g";
   document.getElementById("saltSpins").textContent = rounded(result.spins, 1);
   document.getElementById("saltMealGrams").textContent = rounded(result.grams, 1);
   document.getElementById("saltRiceBonus").textContent = rounded(result.riceBonus, 1);
   document.getElementById("saltDispensed").textContent = rounded(result.saltDispensed, 2).toFixed(2);
   document.getElementById("saltSodium").textContent = Math.round(result.sodiumMg).toLocaleString("en-US");
+  const salted = Boolean(document.getElementById("riceSalted")?.checked);
+  document.getElementById("riceSaltMode").textContent = salted ? "Salted rice" : "Unsalted rice";
+  document.getElementById("unsaltedSaltSummary").hidden = salted;
+  document.getElementById("riceSaltBreakdown").hidden = !salted;
+  const separateSeasoning = salted && hasPortionSeasoningControls();
+  document.getElementById("dashboardActions")?.classList?.toggle("rice-salted-mode", separateSeasoning);
+  document.getElementById("seasoningToggle").hidden = separateSeasoning;
+  if (separateSeasoning) {
+    document.getElementById("seasoningPanel").hidden = true;
+    document.getElementById("seasoningToggle").setAttribute?.("aria-expanded", "false");
+  }
+  if (salted) {
+    const plan = saltedRicePlan(result);
+    document.getElementById("riceDryWeight").textContent = rounded(plan.riceGrams, 1) + " g dry";
+    document.getElementById("riceSaltAmount").textContent = plan.riceSaltG.toFixed(2) + " g salt";
+    // Assign the rounding remainder to the bowl so the displayed salt sums too.
+    const displayedBowl = Math.max(0, rounded(plan.totalSaltG, 2) - rounded(plan.riceSaltG, 2));
+    document.getElementById("bowlSaltAmount").textContent = displayedBowl.toFixed(2) + " g salt";
+    const note = document.getElementById("riceSaltAllocationNote");
+    if (note) {
+      note.hidden = !plan.riceLimited;
+      note.textContent = plan.riceLimited ? "Rice recipe: " + plan.recipeSaltG.toFixed(2) +
+        " g salt; limited to the bowl's " + plan.totalSaltG.toFixed(2) + " g total. No additional bowl salt." : "";
+    }
+    document.getElementById("riceSaltDetails").textContent = "~" + rounded(plan.riceSpins, 1) +
+      " spins \u00b7 " + Math.round(plan.riceSodiumMg).toLocaleString("en-US") + " mg sodium";
+    document.getElementById("bowlSaltDetails").textContent = "~" + rounded(plan.bowlSpins, 1) +
+      " spins \u00b7 " + Math.round(plan.bowlSodiumMg).toLocaleString("en-US") + " mg sodium";
+  }
+  for (const input of inputs) {
+    if (!isRiceForSpins(input.dataset.name)) continue;
+    const badge = input.closest(".foodrow")?.querySelector?.(".rice-salt-badge");
+    if (badge) {
+      badge.textContent = salted ? "Salted separately" : rounded(1 + n(input.dataset.saltExtra), 3) + "\u00d7 salt weight";
+      badge.title = salted ? "Rice uses 3 g salt per 185 g dry rice and is excluded from bowl salt." :
+        "For salt spins: entered grams plus " + n(input.dataset.saltExtra) + " times extra. Calories and macros use the entered grams.";
+    }
+  }
   renderSeasoningCalculator(result.sodiumMg);
 }
 
@@ -150,22 +216,39 @@ function seasoningGramsFor(targetSodiumMg, servingGrams, sodiumPerServing) {
   const grams = targetSodiumMg / sodiumPerServing * servingGrams;
   return Number.isFinite(grams) ? grams : null;
 }
-function renderSeasoningCalculator(targetSodiumMg=computeSaltSpins().sodiumMg) {
-  const servingText = String(document.getElementById("seasoningServing").value ?? "").trim().replace(",", ".");
-  const sodiumText = String(document.getElementById("seasoningSodium").value ?? "").trim().replace(",", ".");
-  const result = document.getElementById("seasoningResult");
-  if (!servingText || !sodiumText) {
-    result.textContent = "Enter a serving size and sodium per serving to calculate grams.";
-    return;
-  }
+function seasoningMessage(targetSodiumMg, servingValue, sodiumValue) {
+  const servingText = String(servingValue ?? "").trim().replace(",", ".");
+  const sodiumText = String(sodiumValue ?? "").trim().replace(",", ".");
+  if (!servingText || !sodiumText) return "Enter a serving size and sodium per serving to calculate grams.";
   const grams = seasoningGramsFor(targetSodiumMg, Number(servingText), Number(sodiumText));
-  if (grams === null) {
-    result.textContent = "Serving size and sodium per serving must both be greater than zero.";
-    return;
-  }
+  if (grams === null) return "Serving size and sodium per serving must both be greater than zero.";
   const amount = grams > 0 && grams < 0.01 ? "<0.01" : rounded(grams, 2).toFixed(2);
-  result.textContent = "Use ~" + amount + " g of seasoning to match ~" +
+  return "Use ~" + amount + " g of seasoning to match ~" +
     Math.round(targetSodiumMg).toLocaleString("en-US") + " mg sodium.";
+}
+function hasPortionSeasoningControls() {
+  return ["rice", "bowl"].every(portion =>
+    ["Serving", "Sodium", "Result"].every(field => document.getElementById(portion + "Seasoning" + field)));
+}
+function renderSeasoningCalculator(targetSodiumMg=computeSaltSpins().sodiumMg) {
+  const serving = document.getElementById("seasoningServing")?.value;
+  const sodium = document.getElementById("seasoningSodium")?.value;
+  const result = document.getElementById("seasoningResult");
+  const plan = saltedRicePlan();
+  // An already-running Flask process can still serve its cached older template
+  // while static files update immediately. Keep that page functional as well.
+  if (result) {
+    result.textContent = document.getElementById("riceSalted")?.checked && !hasPortionSeasoningControls() ?
+      "Rice: " + seasoningMessage(plan.riceSodiumMg, serving, sodium) +
+      "\nRest of bowl: " + seasoningMessage(plan.bowlSodiumMg, serving, sodium) :
+      seasoningMessage(targetSodiumMg, serving, sodium);
+  }
+  for (const [portion, sodiumMg] of [["rice", plan.riceSodiumMg], ["bowl", plan.bowlSodiumMg]]) {
+    const portionResult = document.getElementById(portion + "SeasoningResult");
+    if (portionResult) portionResult.textContent = seasoningMessage(sodiumMg,
+      document.getElementById(portion + "SeasoningServing")?.value,
+      document.getElementById(portion + "SeasoningSodium")?.value);
+  }
 }
 
 function renderTotals() {
@@ -325,6 +408,8 @@ const saveChains = new WeakMap();
 const submittedAmounts = new WeakMap();
 const saveErrors = new Set();
 let pendingSaves = 0;
+let riceSavePromise = Promise.resolve();
+let saltPercentSaving = false;
 function showSaveStatus() {
   statusEl.classList.toggle("save-error", saveErrors.size > 0);
   statusEl.textContent = pendingSaves ? "Saving..." :
@@ -385,6 +470,7 @@ function adjacentDay(isoDay, offset) {
 async function openDay(next) {
   flushAmountSaves();
   await Promise.allSettled(inputs.map(input => saveChains.get(input)).filter(Boolean));
+  await riceSavePromise;
   if (saveErrors.size) return;
   window.location.href = "/?day=" + encodeURIComponent(next);
 }
@@ -1248,6 +1334,11 @@ function applyDayEditingState() {
   document.querySelectorAll(".foodrow .amount-range, #dayFoodPanel input:not(.history-query), #dayFoodPanel button:not(.history-remove), #dayFoodPanel select, #dayFoodPanel textarea")
     .forEach(control => control.disabled = blocked);
   document.getElementById("resetDayButton").disabled = blocked;
+  document.getElementById("riceSalted").disabled = blocked;
+  ["saltPercentInput", "saltPercentSlider"].forEach(id => {
+    const control = document.getElementById(id);
+    if (control) control.disabled = blocked || saltPercentSaving;
+  });
   renderCustomFoodHistory();
   document.querySelectorAll("#dayFoodList input, #dayFoodList button")
     .forEach(control => {
@@ -1273,6 +1364,7 @@ dayLockButton.addEventListener("click", async () => {
   try {
     // Finish all queued slider/checkbox releases before capturing the day.
     await Promise.allSettled(inputs.map(input => saveChains.get(input)).filter(Boolean));
+    await riceSavePromise;
     if (!DAY_LOCKED && saveErrors.size) throw new Error("An entry failed to save. Retry it before locking the day.");
     await requestJson("/api/day-lock", {
       method:"POST", headers:{"Content-Type":"application/json"},
@@ -1295,6 +1387,105 @@ dayLockButton.addEventListener("click", async () => {
 });
 applyDayEditingState();
 
+const riceSaltedControl = document.getElementById("riceSalted");
+riceSaltedControl.addEventListener("change", () => {
+  if (DAY_LOCKED || dayLockChanging || riceSaltedControl.disabled) return;
+  const salted = riceSaltedControl.checked;
+  renderSaltSpins();
+  riceSaltedControl.disabled = true;
+  pendingSaves++;
+  showSaveStatus();
+  const previousSaltSave = riceSavePromise;
+  riceSavePromise = (async () => {
+    await previousSaltSave;
+    try {
+      await requestJson("/api/day-salt", {
+        method:"PATCH", keepalive:true, headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({day:DAY, rice_salted:salted})
+      });
+      saveErrors.delete(riceSaltedControl);
+    } catch (error) {
+      riceSaltedControl.checked = !salted;
+      saveErrors.add(riceSaltedControl);
+      renderSaltSpins();
+    } finally {
+      pendingSaves--;
+      showSaveStatus();
+      riceSaltedControl.disabled = DAY_LOCKED || dayLockChanging;
+    }
+  })();
+});
+
+function previewSaltPercentage(source) {
+  const percent = Number(source.value);
+  const valid = source.value.trim() !== "" && Number.isFinite(percent) && percent >= 0.01 && percent <= 2;
+  const exact = document.getElementById("saltPercentInput");
+  exact?.setCustomValidity(valid ? "" : "Enter a salt percentage between 0.01 and 2.");
+  if (!valid) return false;
+  SALT_GRAMS_PER_SPIN = SHAKER_CALIBRATION.salt_g_per_spin * 100 / percent;
+  if (source.id === "saltPercentSlider" && exact) exact.value = source.value;
+  const slider = document.getElementById("saltPercentSlider");
+  if (slider) slider.value = String(percent);
+  renderSaltSpins();
+  return true;
+}
+function saveSaltPercentage() {
+  const exact = document.getElementById("saltPercentInput");
+  if (!exact || DAY_LOCKED || dayLockChanging || saltPercentSaving) return;
+  if (!previewSaltPercentage(exact)) {
+    saveErrors.add(exact);
+    showSaveStatus();
+    exact.reportValidity();
+    return;
+  }
+  const percent = Number(exact.value);
+  if (Math.abs(percent - confirmedSaltPercent) < 1e-7 && !saveErrors.has(exact)) return;
+  saltPercentSaving = true;
+  pendingSaves++;
+  showSaveStatus();
+  ["saltPercentInput", "saltPercentSlider"].forEach(id => {
+    const control = document.getElementById(id);
+    if (control) control.disabled = true;
+  });
+  const previousSaltSave = riceSavePromise;
+  riceSavePromise = previousSaltSave.then(async () => {
+    try {
+      await requestJson("/api/day-salt", {
+        method:"PATCH", keepalive:true, headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({day:DAY, salt_percent:percent})
+      });
+      confirmedSaltPercent = percent;
+      saveErrors.delete(exact);
+    } catch (error) {
+      saveErrors.add(exact);
+      SALT_GRAMS_PER_SPIN = SHAKER_CALIBRATION.salt_g_per_spin * 100 / confirmedSaltPercent;
+      exact.value = String(confirmedSaltPercent);
+      const slider = document.getElementById("saltPercentSlider");
+      if (slider) slider.value = String(confirmedSaltPercent);
+      renderSaltSpins();
+    } finally {
+      pendingSaves--;
+      saltPercentSaving = false;
+      showSaveStatus();
+      ["saltPercentInput", "saltPercentSlider"].forEach(id => {
+        const control = document.getElementById(id);
+        if (control) control.disabled = DAY_LOCKED || dayLockChanging;
+      });
+    }
+  });
+}
+["saltPercentInput", "saltPercentSlider"].forEach(id => {
+  const control = document.getElementById(id);
+  control?.addEventListener("input", () => {
+    if (!DAY_LOCKED && !dayLockChanging && !saltPercentSaving) previewSaltPercentage(control);
+  });
+  control?.addEventListener("change", saveSaltPercentage);
+  control?.addEventListener("blur", saveSaltPercentage);
+  control?.addEventListener("keydown", event => {
+    if (event.key === "Enter") { event.preventDefault(); saveSaltPercentage(); }
+  });
+});
+
 // This is an independent calculator: it does not modify food entries or locks.
 const seasoningToggle = document.getElementById("seasoningToggle");
 const seasoningPanel = document.getElementById("seasoningPanel");
@@ -1303,7 +1494,11 @@ seasoningToggle.addEventListener("click", () => {
   seasoningToggle.setAttribute("aria-expanded", String(!seasoningPanel.hidden));
   if (!seasoningPanel.hidden) renderSeasoningCalculator();
 });
-["seasoningServing", "seasoningSodium"].forEach(id =>
-  document.getElementById(id).addEventListener("input", () => renderSeasoningCalculator()));
+["seasoningServing", "seasoningSodium", "riceSeasoningServing", "riceSeasoningSodium",
+ "bowlSeasoningServing", "bowlSeasoningSodium"].forEach(id =>
+  document.getElementById(id)?.addEventListener("input", () => renderSeasoningCalculator()));
+
+["riceSeasoning", "bowlSeasoning"].forEach(id =>
+  document.getElementById(id)?.addEventListener("toggle", () => renderSeasoningCalculator()));
 
 refreshCustomFoodHistory();

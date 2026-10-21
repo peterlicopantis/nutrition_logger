@@ -1,12 +1,18 @@
 {% extends "base.html" %}
 {% block title %}Settings · MELB{% endblock %}
 {% block content %}
+{% set default_salt_percent = default_salt_percent|default(0.36324) %}
 <h1 style="font-size:1.35rem">Settings</h1>
 {% if message %}<div class="notice">{{ message }}</div>{% endif %}
+{% if error %}<div class="notice">{{ error }}</div>{% endif %}
 <form method="post" class="panel">
   <label><span>Apple Shortcut name</span>
     <input name="shortcut_name" value="{{ cfg.shortcut_name }}" required>
   </label>
+  <label style="margin-top:12px"><span>Default salt percentage (%)</span>
+    <input name="default_salt_percent" type="number" inputmode="decimal" min="0.01" max="2" step="any" value="{{ '%.8g'|format(default_salt_percent) }}" required>
+  </label>
+  <p class="small">Starts {{ salt_default_effective_day }} for new days. 0.5 means 0.5%: 5 g salt per 1,000 g of calculated salt weight, including extra rice weight. Existing day adjustments and locked days keep their settings.</p>
   <button class="btn primary" style="margin-top:12px" type="submit">Save</button>
 </form>
 
