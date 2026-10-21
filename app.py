@@ -309,6 +309,13 @@ def init_db() -> None:
             salt_columns = {row["name"] for row in conn.execute("PRAGMA table_info(day_salt_settings)")}
             if "salt_percent" not in salt_columns:
                 conn.execute("ALTER TABLE day_salt_settings ADD COLUMN salt_percent REAL")
+            for column, definition in (
+                ("salt_mode", "TEXT NOT NULL DEFAULT 'shared'"),
+                ("rice_salt_per_185", "REAL NOT NULL DEFAULT 3"),
+                ("meal_salt_percent", "REAL NOT NULL DEFAULT 0.5"),
+            ):
+                if column not in salt_columns:
+                    conn.execute(f"ALTER TABLE day_salt_settings ADD COLUMN {column} {definition}")
             conn.execute("""CREATE TABLE IF NOT EXISTS salt_percentage_defaults (
                 effective_day TEXT PRIMARY KEY, salt_percent REAL NOT NULL)""")
             conn.execute("""CREATE TABLE IF NOT EXISTS day_locks (
@@ -806,6 +813,7 @@ def dashboard():
         day=day,
         salt_spins=salt_summary,
         rice_salted=day_rice_salted(day),
+        variable_salt=day_variable_salt_settings(day),
         salt_grams_per_spin=grams_per_spin,
         salt_percent=salt_percent,
         shaker_output=shaker_output,
@@ -867,6 +875,30 @@ def day_grams_per_spin(day: str) -> float:
     return SALT_GRAMS_PER_SPIN if percent is None else SHAKER_SALT_G_PER_SPIN * 100 / percent
 
 
+
+def day_variable_salt_settings(day: str) -> dict:
+    defaults = {"salt_mode": "shared", "rice_salt_per_185": 3.0, "meal_salt_percent": 0.5}
+    snapshot = locked_day_snapshot(day)
+    if snapshot is not None:
+        return {key: snapshot.get(key, value) for key, value in defaults.items()}
+    with db() as conn:
+        row = conn.execute("""SELECT salt_mode, rice_salt_per_185, meal_salt_percent
+                              FROM day_salt_settings WHERE day = ?""", (day,)).fetchone()
+    return dict(row) if row else defaults
+
+
+def checked_variable_ratio(value, maximum: float, label: str) -> float:
+    if isinstance(value, bool):
+        raise ValueError(f"{label} must be between 0 and {maximum:g}.")
+    try:
+        result = float(value)
+    except (TypeError, ValueError, OverflowError):
+        raise ValueError(f"{label} must be between 0 and {maximum:g}.") from None
+    if not math.isfinite(result) or not 0 <= result <= maximum:
+        raise ValueError(f"{label} must be between 0 and {maximum:g}.")
+    return result
+
+
 def day_rice_salted(day: str) -> bool:
     snapshot = locked_day_snapshot(day)
     if snapshot is not None:
@@ -884,17 +916,39 @@ def api_day_salt():
         return jsonify(ok=False, error="Send the selected day and rice setting as JSON."), 400
     try:
         day = required_day(payload)
-        if not {"rice_salted", "salt_percent"}.intersection(payload):
+        if not {"rice_salted", "salt_percent", "salt_mode", "rice_salt_per_185", "meal_salt_percent", "reset_ratios"}.intersection(payload):
             raise ValueError("Choose a rice setting or salt percentage.")
+        if "reset_ratios" in payload and (
+            payload["reset_ratios"] is not True or set(payload) - {"day", "reset_ratios"}):
+            raise ValueError("Reset ratios separately from other changes.")
         if "rice_salted" in payload and not isinstance(payload["rice_salted"], bool):
             raise ValueError("Choose salted or unsalted rice.")
         percent = checked_salt_percentage(payload["salt_percent"]) if "salt_percent" in payload else None
+        if "salt_mode" in payload and payload["salt_mode"] not in ("shared", "variable"):
+            raise ValueError("Choose shared or variable salt mode.")
+        variable_values = {}
+        if "salt_mode" in payload:
+            variable_values["salt_mode"] = payload["salt_mode"]
+        if "rice_salt_per_185" in payload:
+            variable_values["rice_salt_per_185"] = checked_variable_ratio(payload["rice_salt_per_185"], 10, "Rice salt per 185 g")
+        if "meal_salt_percent" in payload:
+            variable_values["meal_salt_percent"] = checked_variable_ratio(payload["meal_salt_percent"], 2, "Meal salt percentage")
     except ValueError as exc:
         return jsonify(ok=False, error=str(exc)), 400
     error = locked_day_error(day)
     if error is not None:
         return error
+    reset_percent = None
+    if payload.get("reset_ratios"):
+        reset_percent = default_salt_percentage(day)
+        if reset_percent is None:
+            reset_percent = SHAKER_SALT_G_PER_SPIN * 100 / SALT_GRAMS_PER_SPIN
     with db() as conn:
+        if reset_percent is not None:
+            conn.execute("""INSERT INTO day_salt_settings(day, salt_percent, rice_salt_per_185, meal_salt_percent)
+                            VALUES (?, ?, 3, 0.5) ON CONFLICT(day) DO UPDATE SET
+                            salt_percent=excluded.salt_percent, rice_salt_per_185=3, meal_salt_percent=0.5""",
+                         (day, reset_percent))
         if "rice_salted" in payload:
             conn.execute("""INSERT INTO day_salt_settings(day, rice_salted) VALUES (?, ?)
                             ON CONFLICT(day) DO UPDATE SET rice_salted = excluded.rice_salted""",
@@ -903,8 +957,12 @@ def api_day_salt():
             conn.execute("""INSERT INTO day_salt_settings(day, salt_percent) VALUES (?, ?)
                             ON CONFLICT(day) DO UPDATE SET salt_percent = excluded.salt_percent""",
                          (day, percent))
+        for column, value in variable_values.items():
+            # Column names come only from the fixed keys validated above.
+            conn.execute(f"""INSERT INTO day_salt_settings(day, {column}) VALUES (?, ?)
+                             ON CONFLICT(day) DO UPDATE SET {column} = excluded.{column}""", (day, value))
     return jsonify(ok=True, rice_salted=day_rice_salted(day),
-                   salt_percent=day_salt_percentage(day))
+                   salt_percent=day_salt_percentage(day), **day_variable_salt_settings(day))
 
 
 
@@ -926,6 +984,7 @@ def api_day_lock():
         if existing is None:
             library = library_state_for_day(day)
             snapshot = {"library": library, "amounts": load_amounts(day),
+                        **day_variable_salt_settings(day),
                         "rice_salted": day_rice_salted(day),
                         "day_foods": load_day_foods(day),
                         "health_snapshot": latest_health_snapshot(day),

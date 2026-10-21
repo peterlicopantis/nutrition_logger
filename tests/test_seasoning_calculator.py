@@ -220,3 +220,132 @@ assert.match(elements.seasoningResult.textContent,/4.89 g/);
         result=subprocess.run([shutil.which("node")],input=harness+functions+assertions.replace("SCREENSHOT_GRAMS_PER_SPIN",repr(melb.SALT_GRAMS_PER_SPIN)),
                               text=True,capture_output=True,timeout=10)
         self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+
+
+    @unittest.skipUnless(shutil.which("node"), "Node.js is needed for variable ratio checks")
+    def test_variable_ratios_are_independent_and_total_salt_and_seasonings_agree(self):
+        source=(Path(__file__).resolve().parents[1]/"static/dashboard.js").read_text()
+        functions=source[source.index("function isRiceForSpins"):source.index("function renderTotals")]
+        harness=r"""
+const assert=require("node:assert/strict");
+const SALT_CATEGORY="Dawg Bowl",SALT_GRAMS_PER_SPIN=20.65;
+const SHAKER_CALIBRATION={salt_g_per_spin:.075,sodium_mg_per_spin:1769/60};
+function n(v){return Number(v)||0;}
+function rounded(v,p=2){return Math.round((v+Number.EPSILON)*10**p)/10**p;}
+function food(name,amount,factor=0,category="Dawg Bowl"){
+ return {dataset:{name,amount,saltExtra:factor},closest(selector){return {dataset:selector===".section"?{category}:{unit:"g"}}}};
+}
+const rice=food("Enriched Rice",185,1.5),meal=food("Chicken",500,3);
+const inputs=[rice,meal,food("Rice",1000,0,"Cream")],dayFoods=[],elements={};
+const document={getElementById(id){return elements[id]||={};}};
+elements.riceRatioInput={value:"3"};elements.mealRatioInput={value:".5"};
+elements.saltVariableMode={checked:false};elements.riceSalted={checked:false};
+const near=(a,b)=>assert.ok(Math.abs(a-b)<1e-9,String(a)+" != "+String(b));
+"""
+        assertions=r"""
+const shared=computeSaltSpins();
+renderSaltSpins();assert.equal(elements.saltCombinedTotal.hidden,true);
+elements.saltVariableMode.checked=true;renderSaltSpins();
+let plan=variableSaltPlan();
+near(plan.riceSaltG,3);near(plan.bowlSaltG,2.5);near(plan.totalSaltG,5.5);
+near(plan.totalSodiumMg,5.5*1769/4.5);
+const shownRice=Number(elements.riceSaltDetails.textContent.match(/([0-9,]+) mg sodium/)[1].replaceAll(",",""));
+const shownMeal=Number(elements.bowlSaltDetails.textContent.match(/([0-9,]+) mg sodium/)[1].replaceAll(",",""));
+near(shownRice+shownMeal,Math.round(plan.totalSodiumMg));
+assert.equal(elements.saltRatioControls.hidden,true);
+assert.equal(elements.riceSaltToggle.hidden,true);
+assert.equal(elements.riceSaltBreakdown.hidden,false);
+assert.match(elements.saltCombinedTotal.textContent,/5.50 g/);
+// Rice has its own ratio and is never capped to a shared total.
+elements.riceRatioInput.value="6";renderSaltSpins();
+near(variableSaltPlan().riceSaltG,6);near(variableSaltPlan().bowlSaltG,2.5);
+elements.mealRatioInput.value="1";renderSaltSpins();
+near(variableSaltPlan().riceSaltG,6);near(variableSaltPlan().bowlSaltG,5);
+near(variableSaltPlan().totalSaltG,11);
+// Use different labels without sharing inputs between portions.
+elements.riceSeasoningServing.value="1";elements.riceSeasoningSodium.value="241";
+elements.bowlSeasoningServing.value="2";elements.bowlSeasoningSodium.value="100";
+renderSeasoningCalculator();
+assert.match(elements.riceSeasoningResult.textContent,/Use ~9.79 g/);
+assert.match(elements.bowlSeasoningResult.textContent,/Use ~39.31 g/);
+// Checked temporary foods count at actual mass, with no extra-weight multiplier.
+dayFoods.push({name:"Rice",serving_g:185,servings:1,include_in_spins:true,salt_extra_weight_factor:9},
+ {name:"Carrot",serving_g:100,servings:2,include_in_spins:true,salt_extra_weight_factor:20},
+ {name:"Rice",serving_g:185,servings:10,include_in_spins:false});
+plan=variableSaltPlan();near(plan.riceGrams,370);near(plan.mealGrams,700);
+near(plan.riceSaltG,12);near(plan.bowlSaltG,7);
+dayFoods.length=0;
+elements.saltVariableMode.checked=false;renderSaltSpins();
+near(computeSaltSpins().saltDispensed,shared.saltDispensed);
+assert.equal(elements.saltRatioControls.hidden,false);
+assert.equal(elements.saltCombinedTotal.hidden,true);
+elements.saltVariableMode.checked=true;
+elements.riceRatioInput.value="0";elements.mealRatioInput.value="0";
+near(variableSaltPlan().totalSaltG,0);near(variableSaltPlan().totalSodiumMg,0);
+rice.dataset.amount=0;meal.dataset.amount=0;
+near(variableSaltPlan().riceSaltG,0);near(variableSaltPlan().bowlSaltG,0);
+"""
+        result=subprocess.run([shutil.which("node")],input=harness+functions+assertions,
+            capture_output=True,text=True,timeout=10)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+
+    @unittest.skipUnless(shutil.which("node"), "Node.js is needed for reset interaction checks")
+    def test_reset_waits_for_pending_save_and_restores_all_ratios(self):
+        source = (Path(__file__).resolve().parents[1] / "static" / "dashboard.js").read_text(encoding="utf-8")
+        handlers = source[source.index("function syncSaltBoxUI()"):source.index("// This is an independent calculator")]
+        harness = r"""
+const assert=require("node:assert/strict");
+const elements=new Map();
+function element(id){
+ if(!elements.has(id)) elements.set(id,{id,disabled:false,value:"9",dataset:{},
+  addEventListener(type,fn){this[type]=fn;},setCustomValidity(){},textContent:""});
+ return elements.get(id);
+}
+const document={getElementById:element};
+let DAY_LOCKED=false,dayLockChanging=false,resettingSaltRatios=false,pendingSaves=1;
+let confirmedSaltPercent=.9,SALT_GRAMS_PER_SPIN=1;
+const DAY="2026-10-07",SHAKER_CALIBRATION={salt_g_per_spin:.075};
+const variableControlIds=["saltVariableMode","riceRatioInput","riceRatioSlider","mealRatioInput","mealRatioSlider"];
+let confirmedVariableSettings={salt_mode:"variable",rice_salt_per_185:9,meal_salt_percent:1};
+let finishPrior;
+let riceSavePromise=new Promise(resolve=>{finishPrior=resolve;});
+const saveErrors=new Set();let requests=0;
+function syncSaltChoiceSelection(){}
+function showSaveStatus(){syncSaltBoxUI();}
+function applyDayEditingState(){
+ for(const id of ["riceSalted","saltPercentInput",...variableControlIds]) element(id).disabled=resettingSaltRatios;
+ syncSaltBoxUI();
+}
+function syncVariableSettings(settings){
+ element("riceRatioInput").value=String(settings.rice_salt_per_185);
+ element("mealRatioInput").value=String(settings.meal_salt_percent);
+}
+function renderSaltSpins(){}
+async function requestJson(url,options){
+ requests++;
+ assert.deepEqual(JSON.parse(options.body),{day:DAY,reset_ratios:true});
+ return {salt_percent:.4,salt_mode:"variable",rice_salt_per_185:3,meal_salt_percent:.5};
+}
+""" + handlers + r"""
+(async()=>{
+ assert.equal(element("resetSaltRatios").disabled,false);
+ element("resetSaltRatios").click();
+ assert.equal(resettingSaltRatios,true);
+ assert.equal(element("resetSaltRatios").disabled,true);
+ assert.equal(element("riceRatioInput").disabled,true);
+ assert.equal(requests,0);
+ pendingSaves--;finishPrior();
+ await riceSavePromise;
+ assert.equal(requests,1);
+ assert.equal(confirmedSaltPercent,.4);
+ assert.equal(element("riceRatioInput").value,"3");
+ assert.equal(element("mealRatioInput").value,"0.5");
+ assert.equal(confirmedVariableSettings.salt_mode,"variable");
+ assert.equal(pendingSaves,0);
+ assert.equal(element("resetSaltRatios").disabled,false);
+ DAY_LOCKED=true;syncSaltBoxUI();
+ assert.equal(element("resetSaltRatios").disabled,true);
+})().catch(error=>{console.error(error);process.exitCode=1;});
+"""
+        result = subprocess.run(["node","-e",harness],capture_output=True,text=True)
+        self.assertEqual(result.returncode,0,result.stderr)
