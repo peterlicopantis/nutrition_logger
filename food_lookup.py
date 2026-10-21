@@ -328,6 +328,12 @@ def _match_score(query: str, product: dict, original: dict) -> tuple | None:
     return (
         -len(wanted & title) / len(wanted),
         -(query_phrase in title_phrase),
+        # Prefer usable portions among relevant matches. A real gram weight
+        # supports both portion macros and bowl calculations; a label-only
+        # serving is still more useful than a bare 100 g reference.
+        0 if product.get("serving_g") else (
+            1 if product.get("basis") == "serving"
+            and _text(original.get("serving_size")) else 2),
         -bool(_text(original.get("product_name_en"))),
         len(title - wanted),
     )

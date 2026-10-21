@@ -129,3 +129,31 @@ class SearchServiceTests(unittest.TestCase):
         product = lookup._normalize_search_hit(hit)
         self.assertEqual(product["basis"], "100g")
         self.assertEqual(product["serving_label"], "100 g")
+
+    def test_complete_portions_rank_ahead_of_bare_reference_results(self):
+        incomplete = daily_tests.label_product(code="11111111",product_name="Mega Snack",
+            serving_size="",serving_quantity=None,serving_quantity_unit="")
+        complete = daily_tests.label_product(code="22222222",product_name="Mega Snack Bites",
+            serving_size="5 bites (28 g)",serving_quantity=28,serving_quantity_unit="g")
+        unrelated = daily_tests.label_product(code="33333333",product_name="Other Food",
+            serving_size="1 piece (50 g)",serving_quantity=50,serving_quantity_unit="g")
+        for staging, key in ((False,"hits"),(True,"products")):
+            with self.subTest(staging=staging):
+                with patch.object(lookup,"_request_json",return_value={key:[incomplete,unrelated,complete]}):
+                    products=lookup._fetch_products("mega snack",barcode=False,staging=staging)
+                self.assertEqual([p["barcode"] for p in products],["22222222","11111111"])
+                self.assertEqual(products[0]["serving_g"],28)
+                self.assertTrue(products[1]["requires_weight"])
+
+    def test_real_volume_portion_ranks_above_synthetic_volume_reference(self):
+        reference=daily_tests.label_product(code="11111111",product_name="Mega Drink",
+            serving_size="",serving_quantity=None,serving_quantity_unit="",
+            quantity="500 ml",categories_tags=["en:beverages"])
+        portion=daily_tests.label_product(code="22222222",product_name="Mega Drink",
+            serving_size="1 can (250 ml)",serving_quantity=250,serving_quantity_unit="ml",
+            product_quantity_unit="ml",nutriments={"energy-kcal_serving":115,
+                "proteins_serving":0,"carbohydrates_serving":27.5,"fat_serving":0})
+        with patch.object(lookup,"_request_json",return_value={"hits":[reference,portion]}):
+            products=lookup._fetch_products("mega drink",barcode=False,staging=False)
+        self.assertEqual(products[0]["barcode"],"22222222")
+        self.assertIsNone(products[0]["serving_g"])
